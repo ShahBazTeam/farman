@@ -1,0 +1,10 @@
+Pinar typeface
+Copyright (c) 2020 www.fontamin.com
+All rights reserved.
+
+The Latin section is based on Commissioner, licensed under the SIL Open Font
+License, Version 1.1.
+
+Pinar is bundled with FARMAN Terminal as the interface typeface. Persian and
+Latin interface text is rendered with Pinar. Vazirmatn remains bundled as a
+fallback for symbols that Pinar does not cover.

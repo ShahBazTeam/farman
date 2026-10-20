@@ -1,0 +1,45 @@
+# FARMAN Terminal configuration — version 1
+# Copy to %APPDATA%\FARMAN\config.toml only if you want to change defaults.
+# FARMAN never overwrites an invalid configuration; it keeps a backup instead.
+
+version = 1
+theme = "farman-dark"          # farman-dark | midnight | graphite
+default_profile = "powershell" # powershell | pwsh | cmd | wsl | custom id
+startup_directory = ""         # empty = user home
+scrollback = 10000
+
+[font]
+family = "Vazir Code Hack"     # must be monospaced and cover Persian
+size = 16.0                    # logical pixels; clamped 8..48
+line_height = 1.35             # clamped 1.0..2.0
+
+[cursor]
+style = "block"                # block | beam | underline
+blink = false                  # reserved; cursor is solid in this milestone
+
+[window]
+width = 1180
+height = 720
+maximized = false
+opacity = 1.0                  # validated but not applied yet
+
+[bidi]
+enabled = true
+direction = "auto"             # auto | ltr | rtl
+
+[keybindings]
+new_tab = "Ctrl+Shift+T"
+close_tab = "Ctrl+Shift+W"
+copy = "Ctrl+Shift+C"
+paste = "Ctrl+Shift+V"
+settings = "Ctrl+Comma"
+font_increase = "Ctrl+Equal"
+font_decrease = "Ctrl+Minus"
+next_tab = "Ctrl+Tab"
+
+# Additional profiles are explicit. Only the configured program is executed.
+# [profiles.my-pwsh]
+# name = "PowerShell 7 (my profile)"
+# program = "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
+# args = ["-NoLogo"]
+# cwd = "D:\\work"
