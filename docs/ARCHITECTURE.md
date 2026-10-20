@@ -128,9 +128,9 @@ goes to the run's left edge. This is a best-effort mapping; see limitations.
 - Modal hit regions are registered full-screen first, then the panel as
   `Noop`, then individual controls. Reverse-order hit testing lets a palette row
   win over the dismiss layer without duplicating state.
-- Base UI text is suppressed while Settings or the command palette is open so
-  background controls do not compete with the focused surface. Terminal glyphs
-  remain underneath the overlay scrim.
+- Base UI text stays in the scene while Settings or the command palette is
+  open; the overlay scrim and opaque sheet suppress it visually without the
+  chrome popping in or out. Terminal glyphs remain underneath the scrim.
 - ANSI named/indexed/true colors are resolved from the active theme, with
   session-level color overrides honored.
 - Inverse, bold, italic, underline, strikeout and wide-cell flags are mapped
@@ -171,15 +171,19 @@ rounded corners; acrylic is not applied to the client area.
 - The window is centered/clamped to the primary monitor work area at startup so
   the status bar is not hidden under the taskbar on high-DPI displays.
 - Visual language: floating glass header/status cards, a rounded terminal
-  pane, pill tabs and controls, restrained cyan/violet ambience, and no
-  decorative dashboard chrome. The terminal receives the vast majority of the
-  window.
-- Header: brand, tabs with status dots/close buttons, new-tab and settings.
-- Status: profile selector chip, short status, UTF-8/grid size/BIDI/version.
+  pane with a right-hand session inspector, pill tabs and controls, and
+  theme-driven accents. The terminal receives the vast majority of the window.
+- Header: brand mark, tabs with status dots/close buttons, new-tab and
+  settings, plus a search field.
+- Workspace: terminal card on the left and a narrow session inspector on the
+  right with the active shell, encoding, renderer, theme and RTL shaping, plus
+  a grid summary footer.
+- Status: profile selector chip, grid, UTF-8, RTL shaping and version.
   Redundant "Ready" status is suppressed for a quieter default state.
-- Settings: font size, themes, default shell, bidi toggle, config path and
-  reload. The UI is English-first and uses Pinar for interface typography;
-  Persian terminal text is shaped through the same glyph pipeline.
+- Settings: a six-theme visual gallery with swatches, font size, default
+  shell, bidi toggle, config path and version. The UI is English-first and
+  uses Pinar for interface typography; Persian terminal text is shaped through
+  the same glyph pipeline.
 - Empty state, starting state, exit banner and error banner are rendered even
   when no terminal text exists.
 

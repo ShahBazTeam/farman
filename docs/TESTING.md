@@ -127,6 +127,12 @@ These were performed against the actual GUI process:
 13. **Startup safety**: before switching to `-NoProfile`, a user PowerShell
     profile launched an external application (OpenCode). Built-in profiles now
     pass `-NoProfile`, and a clean launch shows only the prompt.
+14. **Theme gallery and session inspector**: each of the six cards previews its
+    background, accent and ANSI colors and applies immediately; the inspector
+    updates the theme name, shell, encoding, renderer and RTL state. The
+    palette lists all six themes. Captured in
+    [settings.png](images/settings.png) and
+    [command-palette.png](images/command-palette.png).
 
 ## Installer smoke test
 

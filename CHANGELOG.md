@@ -2,6 +2,24 @@
 
 All notable changes to FARMAN Terminal are documented here.
 
+## Unreleased
+
+### Added
+
+- Visual theme gallery in Settings with six built-in color schemes:
+  FARMAN Dark, Midnight Blue, Graphite, Aurora, Nord and Ember.
+- Live session inspector beside the terminal showing the active shell,
+  encoding, renderer, theme and RTL shaping state.
+- Theme entries for every built-in scheme in the command palette.
+
+### Changed
+
+- Refined the workspace into a rounded terminal card with a right-hand
+  session panel, and updated the status bar, tabs, shell pill and search field
+  to match.
+- Theme cards show background, accent and ANSI color previews and apply
+  immediately.
+
 ## 0.3.0
 
 ### Added

@@ -6,6 +6,7 @@ use crate::types::Rgb;
 pub struct Theme {
     pub name: &'static str,
     pub display_name: &'static str,
+    pub description: &'static str,
     pub background: Rgb,
     pub foreground: Rgb,
     pub bright_foreground: Rgb,
@@ -29,13 +30,23 @@ pub struct Theme {
 }
 
 impl Theme {
-    pub const NAMES: [&'static str; 3] = ["farman-dark", "midnight", "graphite"];
+    pub const NAMES: [&'static str; 6] = [
+        "farman-dark",
+        "midnight",
+        "graphite",
+        "aurora",
+        "nord",
+        "ember",
+    ];
 
     pub fn by_name(name: &str) -> Option<&'static Theme> {
         match name {
             "farman-dark" => Some(&FARMAN_DARK),
             "midnight" => Some(&MIDNIGHT),
             "graphite" => Some(&GRAPHITE),
+            "aurora" => Some(&AURORA),
+            "nord" => Some(&NORD),
+            "ember" => Some(&EMBER),
             _ => None,
         }
     }
@@ -83,6 +94,7 @@ const fn rgb(hex: u32) -> Rgb {
 pub static FARMAN_DARK: Theme = Theme {
     name: "farman-dark",
     display_name: "FARMAN Dark",
+    description: "Cyan on deep ink",
     background: rgb(0x080D18),
     foreground: rgb(0xD7E2F0),
     bright_foreground: rgb(0xF2F7FF),
@@ -125,6 +137,7 @@ pub static FARMAN_DARK: Theme = Theme {
 pub static MIDNIGHT: Theme = Theme {
     name: "midnight",
     display_name: "Midnight Blue",
+    description: "Cool blue hour",
     background: rgb(0x050914),
     foreground: rgb(0xCFE0F5),
     bright_foreground: rgb(0xECF5FF),
@@ -167,6 +180,7 @@ pub static MIDNIGHT: Theme = Theme {
 pub static GRAPHITE: Theme = Theme {
     name: "graphite",
     display_name: "Graphite",
+    description: "Restrained neutral",
     background: rgb(0x111315),
     foreground: rgb(0xD9DEE5),
     bright_foreground: rgb(0xF1F4F7),
@@ -206,17 +220,157 @@ pub static GRAPHITE: Theme = Theme {
     ],
 };
 
+pub static AURORA: Theme = Theme {
+    name: "aurora",
+    display_name: "Aurora",
+    description: "Violet and magenta",
+    background: rgb(0x0A0714),
+    foreground: rgb(0xE8DEF8),
+    bright_foreground: rgb(0xF7F1FF),
+    dim_foreground: rgb(0x9D91B5),
+    cursor: rgb(0xE879F9),
+    cursor_text: rgb(0x12071B),
+    selection: rgb(0x3A2456),
+    header_bg: rgb(0x100A1D),
+    header_active: rgb(0x1A1030),
+    status_bg: rgb(0x0C0817),
+    panel_bg: rgb(0x160E26),
+    panel_alt: rgb(0x1F1533),
+    border: rgb(0x33224D),
+    muted: rgb(0x8F82A8),
+    accent: rgb(0xD946EF),
+    accent_violet: rgb(0x7C3AED),
+    success: rgb(0x4ADE80),
+    warning: rgb(0xFBBF24),
+    error: rgb(0xFB7185),
+    ansi: [
+        rgb(0x241735),
+        rgb(0xF47C9B),
+        rgb(0x6EE7B7),
+        rgb(0xF5C86B),
+        rgb(0x8B9BFF),
+        rgb(0xE879F9),
+        rgb(0x67E8F9),
+        rgb(0xE9DDF5),
+        rgb(0x4A3463),
+        rgb(0xFF9DB4),
+        rgb(0x8FF3CE),
+        rgb(0xFFDD8E),
+        rgb(0xABB5FF),
+        rgb(0xF5A6FF),
+        rgb(0x9BF2FF),
+        rgb(0xFFF5FF),
+    ],
+};
+
+pub static NORD: Theme = Theme {
+    name: "nord",
+    display_name: "Nord",
+    description: "Arctic blue",
+    background: rgb(0x10151F),
+    foreground: rgb(0xD8DEE9),
+    bright_foreground: rgb(0xECEFF4),
+    dim_foreground: rgb(0x8A94A7),
+    cursor: rgb(0x88C0D0),
+    cursor_text: rgb(0x0B0F16),
+    selection: rgb(0x33415A),
+    header_bg: rgb(0x141A26),
+    header_active: rgb(0x1C2433),
+    status_bg: rgb(0x0E131C),
+    panel_bg: rgb(0x18202D),
+    panel_alt: rgb(0x202A3A),
+    border: rgb(0x2E3A4E),
+    muted: rgb(0x7F8CA3),
+    accent: rgb(0x88C0D0),
+    accent_violet: rgb(0xB48EAD),
+    success: rgb(0xA3BE8C),
+    warning: rgb(0xEBCB8B),
+    error: rgb(0xBF616A),
+    ansi: [
+        rgb(0x2E3440),
+        rgb(0xBF616A),
+        rgb(0xA3BE8C),
+        rgb(0xEBCB8B),
+        rgb(0x81A1C1),
+        rgb(0xB48EAD),
+        rgb(0x88C0D0),
+        rgb(0xD8DEE9),
+        rgb(0x4C566A),
+        rgb(0xD08770),
+        rgb(0xB9D6A0),
+        rgb(0xF2D9A0),
+        rgb(0x9DB8D6),
+        rgb(0xC9A8C2),
+        rgb(0x9DD6DE),
+        rgb(0xECEFF4),
+    ],
+};
+
+pub static EMBER: Theme = Theme {
+    name: "ember",
+    display_name: "Ember",
+    description: "Warm amber",
+    background: rgb(0x140D0A),
+    foreground: rgb(0xF0DFD2),
+    bright_foreground: rgb(0xFFF4EA),
+    dim_foreground: rgb(0xA78E7C),
+    cursor: rgb(0xFF9E64),
+    cursor_text: rgb(0x180C06),
+    selection: rgb(0x4A2C1E),
+    header_bg: rgb(0x1A100C),
+    header_active: rgb(0x261711),
+    status_bg: rgb(0x120B08),
+    panel_bg: rgb(0x20140F),
+    panel_alt: rgb(0x2A1B14),
+    border: rgb(0x3F2A1F),
+    muted: rgb(0x9B8173),
+    accent: rgb(0xFF9E64),
+    accent_violet: rgb(0xE0AF68),
+    success: rgb(0x9ECE6A),
+    warning: rgb(0xE0AF68),
+    error: rgb(0xF7768E),
+    ansi: [
+        rgb(0x2A1B14),
+        rgb(0xF7768E),
+        rgb(0x9ECE6A),
+        rgb(0xE0AF68),
+        rgb(0x7AA2F7),
+        rgb(0xBB9AF7),
+        rgb(0x7DCFFF),
+        rgb(0xC0CAF5),
+        rgb(0x4A3427),
+        rgb(0xFF9DB0),
+        rgb(0xB9E88A),
+        rgb(0xF0C987),
+        rgb(0x9AB8FF),
+        rgb(0xD4B8FF),
+        rgb(0xA3E4FF),
+        rgb(0xE6EEF9),
+    ],
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn all_themes_resolve() {
+        let mut names = std::collections::HashSet::new();
+        let mut backgrounds = std::collections::HashSet::new();
+        let mut accents = std::collections::HashSet::new();
         for name in Theme::NAMES {
+            assert!(names.insert(name), "duplicate theme name: {name}");
             let theme = Theme::by_name(name).expect("theme");
             assert_eq!(theme.name, name);
+            assert!(!theme.description.is_empty(), "missing description: {name}");
             assert!(theme.foreground.luminance() > theme.background.luminance());
+            assert!(
+                backgrounds.insert(theme.background),
+                "duplicate theme background: {name}"
+            );
+            assert!(accents.insert(theme.accent), "duplicate theme accent: {name}");
         }
+        assert_eq!(names.len(), Theme::NAMES.len());
     }
 
     #[test]

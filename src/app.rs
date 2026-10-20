@@ -50,10 +50,15 @@ struct Tab {
 
 impl Tab {
     fn display_title(&self) -> String {
-        if !self.title.is_empty() {
+        let path_like = self.title.contains('\\')
+            && self.title.to_ascii_lowercase().ends_with(".exe");
+        if !self.title.is_empty() && !path_like {
             truncate_title(&self.title, 36)
         } else {
-            self.profile_name.clone()
+            self.profile_name
+                .strip_prefix("Windows ")
+                .unwrap_or(&self.profile_name)
+                .to_owned()
         }
     }
 
@@ -1417,7 +1422,20 @@ impl App {
         let scale = window.scale_factor() as f32;
         let mut tab_titles: Vec<String> = Vec::with_capacity(self.tabs.len());
         for tab in &self.tabs {
-            tab_titles.push(tab.display_title());
+            let title = tab.display_title();
+            if tab.title.is_empty() {
+                tab_titles.push(title);
+                continue;
+            }
+            let profile = tab
+                .profile_name
+                .strip_prefix("Windows ")
+                .unwrap_or(&tab.profile_name);
+            if title.contains(profile) {
+                tab_titles.push(title);
+            } else {
+                tab_titles.push(format!("{profile} - {title}"));
+            }
         }
         let tab_infos: Vec<TabInfo<'_>> = self
             .tabs

@@ -3,7 +3,7 @@
 # FARMAN never overwrites an invalid configuration; it keeps a backup instead.
 
 version = 1
-theme = "farman-dark"          # farman-dark | midnight | graphite
+theme = "farman-dark"          # farman-dark | midnight | graphite | aurora | nord | ember
 default_profile = "powershell" # powershell | pwsh | cmd | wsl | custom id
 startup_directory = ""         # empty = user home
 scrollback = 10000

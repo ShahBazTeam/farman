@@ -32,8 +32,11 @@ positions remain correct.
 - **GPU terminal** - `winit` + `wgpu` + `glyphon` + `cosmic-text`, with ANSI/VT
   parsing from `alacritty_terminal`.
 - **Focused glass UI** - frameless custom chrome, translucent cards, soft
-  shadows, accent gradients, tabs, profile menu and a settings sheet. The
-  terminal stays the dominant, high-contrast surface.
+  shadows, accent gradients, a live session inspector, tabs, profile menu and
+  a settings sheet. The terminal stays the dominant, high-contrast surface.
+- **Six built-in themes** - FARMAN Dark, Midnight Blue, Graphite, Aurora, Nord
+  and Ember, with a visual theme gallery in Settings and instant switching from
+  the command palette.
 - **Native details** - DWM dark mode and rounded corners, per-monitor DPI,
   edge drag-resize, Windows clipboard, OSC 52 copy, bracketed paste.
 - **Private by default** - no telemetry, no network access, and no shell
@@ -44,8 +47,23 @@ positions remain correct.
 ![FARMAN command palette](docs/images/command-palette.png)
 
 `Ctrl+K` opens a keyboard-first palette with fuzzy multi-term filtering,
-`Up`/`Down` navigation, and `Enter` to run. It also learns the three themes and
-the bidi toggle, so the most useful settings are one keystroke away.
+`Up`/`Down` navigation, and `Enter` to run. It includes every built-in theme
+and the bidi toggle, so the most useful settings are one keystroke away.
+
+## Themes
+
+Open **Settings** (`Ctrl+,`) to see the theme gallery. Each card previews the
+background, accent colors and ANSI palette, and applies the theme instantly.
+The choice is saved to `config.toml`.
+
+| Theme | Mood |
+| --- | --- |
+| FARMAN Dark | Cyan on deep ink |
+| Midnight Blue | Cool blue hour |
+| Graphite | Restrained neutral |
+| Aurora | Violet and magenta |
+| Nord | Arctic blue |
+| Ember | Warm amber |
 
 ## Install
 

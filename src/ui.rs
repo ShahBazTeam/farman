@@ -18,6 +18,8 @@ const STATUS_H: f32 = 26.0;
 const PAGE_PAD: f32 = 8.0;
 const PANEL_INSET_X: f32 = 12.0;
 const PANEL_INSET_Y: f32 = 10.0;
+const INSPECTOR_W: f32 = 184.0;
+const INSPECTOR_GAP: f32 = 10.0;
 const WINDOW_BUTTON_W: f32 = 46.0;
 
 #[derive(Debug, Clone)]
@@ -54,6 +56,9 @@ pub enum PaletteCommand {
     ThemeDark,
     ThemeMidnight,
     ThemeGraphite,
+    ThemeAurora,
+    ThemeNord,
+    ThemeEmber,
     Bidi,
     Profiles,
     Reload,
@@ -67,6 +72,9 @@ impl PaletteCommand {
             Self::ThemeDark => UiAction::SetTheme("farman-dark".to_owned()),
             Self::ThemeMidnight => UiAction::SetTheme("midnight".to_owned()),
             Self::ThemeGraphite => UiAction::SetTheme("graphite".to_owned()),
+            Self::ThemeAurora => UiAction::SetTheme("aurora".to_owned()),
+            Self::ThemeNord => UiAction::SetTheme("nord".to_owned()),
+            Self::ThemeEmber => UiAction::SetTheme("ember".to_owned()),
             Self::Bidi => UiAction::ToggleBidi,
             Self::Profiles => UiAction::ToggleProfileMenu,
             Self::Reload => UiAction::ReloadConfig,
@@ -81,7 +89,7 @@ pub struct PaletteItem {
     pub command: PaletteCommand,
 }
 
-const PALETTE_ITEMS: [PaletteItem; 8] = [
+const PALETTE_ITEMS: [PaletteItem; 11] = [
     PaletteItem {
         title: "New tab",
         hint: "Ctrl+Shift+T",
@@ -106,6 +114,21 @@ const PALETTE_ITEMS: [PaletteItem; 8] = [
         title: "Theme: Graphite",
         hint: "Neutral",
         command: PaletteCommand::ThemeGraphite,
+    },
+    PaletteItem {
+        title: "Theme: Aurora",
+        hint: "Violet",
+        command: PaletteCommand::ThemeAurora,
+    },
+    PaletteItem {
+        title: "Theme: Nord",
+        hint: "Arctic",
+        command: PaletteCommand::ThemeNord,
+    },
+    PaletteItem {
+        title: "Theme: Ember",
+        hint: "Amber",
+        command: PaletteCommand::ThemeEmber,
     },
     PaletteItem {
         title: "Toggle bidi shaping",
@@ -191,6 +214,7 @@ struct Layout {
     toolbar: Rect,
     panel: Rect,
     terminal: Rect,
+    inspector: Rect,
     status: Rect,
 }
 
@@ -213,17 +237,31 @@ fn layout(width: f32, height: f32, s: f32) -> Layout {
         (width - pad * 2.0).max(1.0),
         (panel_bottom - panel_y).max(1.0),
     );
-    let terminal = Rect::new(
+    let inner = Rect::new(
         panel.x + PANEL_INSET_X * s,
         panel.y + PANEL_INSET_Y * s,
         (panel.w - PANEL_INSET_X * 2.0 * s).max(1.0),
         (panel.h - PANEL_INSET_Y * 2.0 * s).max(1.0),
+    );
+    let inspector_w = (INSPECTOR_W * s).min((inner.w * 0.32).max(150.0 * s));
+    let inspector = Rect::new(
+        inner.right() - inspector_w,
+        inner.y,
+        inspector_w,
+        inner.h,
+    );
+    let terminal = Rect::new(
+        inner.x,
+        inner.y,
+        (inner.w - inspector.w - INSPECTOR_GAP * s).max(1.0),
+        inner.h,
     );
     Layout {
         title,
         toolbar,
         panel,
         terminal,
+        inspector,
         status,
     }
 }
@@ -305,6 +343,18 @@ pub fn build(input: ChromeInput<'_>) -> Chrome {
     let mut hits = Vec::new();
 
     paint_backdrop(&mut base_quads, width, height, theme, s);
+    paint_workspace(
+        &mut base_quads,
+        &mut base_text,
+        &l,
+        theme,
+        active_profile,
+        theme_name,
+        cols,
+        rows,
+        bidi_enabled,
+        s,
+    );
     paint_title_bar(
         &mut base_quads,
         &mut base_text,
@@ -317,6 +367,16 @@ pub fn build(input: ChromeInput<'_>) -> Chrome {
         maximized,
         s,
     );
+    let selected_profile_name = profiles
+        .iter()
+        .find(|profile| profile.id == selected_profile)
+        .map(|profile| {
+            profile
+                .name
+                .strip_prefix("Windows ")
+                .unwrap_or(profile.name.as_str())
+        })
+        .unwrap_or(selected_profile);
     paint_toolbar(
         &mut base_quads,
         &mut base_text,
@@ -327,7 +387,7 @@ pub fn build(input: ChromeInput<'_>) -> Chrome {
         theme,
         tabs,
         active,
-        selected_profile,
+        selected_profile_name,
         settings_open,
         profile_menu_open,
         mouse,
@@ -390,9 +450,7 @@ pub fn build(input: ChromeInput<'_>) -> Chrome {
         );
     }
 
-    if !settings_open && !palette_open {
-        text.extend(base_text);
-    }
+    text.extend(base_text);
 
     if profile_menu_open {
         let rects = toolbar_rects(width, height, s);
@@ -507,6 +565,322 @@ fn paint_backdrop(
     ));
 }
 
+#[allow(clippy::too_many_arguments)]
+fn paint_workspace(
+    quads: &mut Vec<Quad>,
+    text: &mut Vec<TextBlock>,
+    l: &Layout,
+    theme: &Theme,
+    active_profile: &str,
+    theme_name: &str,
+    cols: usize,
+    rows: usize,
+    bidi_enabled: bool,
+    s: f32,
+) {
+    quads.push(Quad::rounded(l.panel, alpha(theme.border, 0.58), 13.0 * s));
+    quads.push(Quad::glass(
+        l.panel.inset(1.0 * s, 1.0 * s),
+        alpha(theme.header_bg, 0.82),
+        alpha(theme.background.blend(theme.panel_bg, 0.34), 0.90),
+        12.0 * s,
+    ));
+    quads.push(Quad::glass(
+        l.terminal,
+        alpha(theme.background.blend(theme.header_bg, 0.35), 0.72),
+        alpha(theme.background, 0.64),
+        8.0 * s,
+    ));
+    paint_inspector(
+        quads,
+        text,
+        l.inspector,
+        theme,
+        active_profile,
+        theme_name,
+        cols,
+        rows,
+        bidi_enabled,
+        s,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn paint_inspector(
+    quads: &mut Vec<Quad>,
+    text: &mut Vec<TextBlock>,
+    rect: Rect,
+    theme: &Theme,
+    active_profile: &str,
+    theme_name: &str,
+    cols: usize,
+    rows: usize,
+    bidi_enabled: bool,
+    s: f32,
+) {
+    quads.push(Quad::rounded(rect, alpha(theme.border, 0.62), 9.0 * s));
+    quads.push(Quad::glass(
+        rect.inset(1.0 * s, 1.0 * s),
+        alpha(theme.panel_alt, 0.66),
+        alpha(theme.panel_bg, 0.82),
+        8.0 * s,
+    ));
+
+    let left = rect.x + 16.0 * s;
+    let right = rect.right() - 16.0 * s;
+    let content_w = (right - left).max(1.0);
+    let header_y = rect.y + 15.0 * s;
+    quads.push(Quad::rounded(
+        Rect::new(left, header_y + 1.0 * s, 2.0 * s, 12.0 * s),
+        alpha(theme.accent, 0.95),
+        1.0 * s,
+    ));
+    quads.push(Quad::rounded(
+        Rect::new(left + 5.0 * s, header_y + 5.0 * s, 2.0 * s, 4.0 * s),
+        alpha(theme.accent, 0.50),
+        1.0 * s,
+    ));
+    quads.push(Quad::rounded(
+        Rect::new(left + 9.0 * s, header_y + 2.5 * s, 2.0 * s, 9.0 * s),
+        alpha(theme.accent, 0.72),
+        1.0 * s,
+    ));
+    text.push(
+        TextBlock::new(
+            "SESSION",
+            Rect::new(left + 18.0 * s, header_y, content_w - 18.0 * s, 12.0 * s),
+            7.4 * s,
+            theme.muted,
+        )
+        .weight(Weight::SEMIBOLD)
+        .width(content_w - 18.0 * s),
+    );
+    quads.push(Quad::rounded(
+        Rect::new(left, rect.y + 38.0 * s, content_w, 1.0 * s),
+        alpha(theme.border, 0.62),
+        0.0,
+    ));
+
+    let mut y = rect.y + 56.0 * s;
+    let row_gap = 58.0 * s;
+    inspector_item(
+        quads,
+        text,
+        left,
+        y,
+        content_w,
+        InspectorIcon::Shell,
+        "Shell",
+        active_profile,
+        theme,
+        s,
+    );
+    y += row_gap;
+    inspector_item(
+        quads,
+        text,
+        left,
+        y,
+        content_w,
+        InspectorIcon::Code,
+        "Encoding",
+        "UTF-8",
+        theme,
+        s,
+    );
+    y += row_gap;
+    inspector_item(
+        quads,
+        text,
+        left,
+        y,
+        content_w,
+        InspectorIcon::Display,
+        "Renderer",
+        "GPU / wgpu",
+        theme,
+        s,
+    );
+    y += row_gap;
+    inspector_item(
+        quads,
+        text,
+        left,
+        y,
+        content_w,
+        InspectorIcon::Swatch,
+        "Theme",
+        Theme::display_name_for(theme_name),
+        theme,
+        s,
+    );
+    y += row_gap;
+    inspector_item(
+        quads,
+        text,
+        left,
+        y,
+        content_w,
+        InspectorIcon::Shield,
+        "RTL shaping",
+        if bidi_enabled { "Enabled" } else { "Off" },
+        theme,
+        s,
+    );
+
+    let footer = Rect::new(
+        left,
+        rect.bottom() - 46.0 * s,
+        content_w,
+        30.0 * s,
+    );
+    quads.push(Quad::rounded(footer, alpha(theme.foreground, 0.035), 7.0 * s));
+    quads.push(Quad::rounded(footer, alpha(theme.border, 0.62), 7.0 * s));
+    quads.push(Quad::rounded(
+        Rect::new(footer.x + 10.0 * s, footer.y + 13.0 * s, 4.0 * s, 4.0 * s),
+        Rgba::opaque(theme.success),
+        2.0 * s,
+    ));
+    text.push(
+        TextBlock::new(
+            format!("{cols} x {rows} cells"),
+            Rect::new(
+                footer.x + 20.0 * s,
+                footer.y + 9.0 * s,
+                footer.w - 28.0 * s,
+                12.0 * s,
+            ),
+            7.8 * s,
+            theme.muted,
+        )
+        .width(footer.w - 28.0 * s),
+    );
+}
+
+#[derive(Debug, Clone, Copy)]
+enum InspectorIcon {
+    Shell,
+    Code,
+    Display,
+    Swatch,
+    Shield,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn inspector_item(
+    quads: &mut Vec<Quad>,
+    text: &mut Vec<TextBlock>,
+    x: f32,
+    y: f32,
+    w: f32,
+    icon: InspectorIcon,
+    label: &str,
+    value: &str,
+    theme: &Theme,
+    s: f32,
+) {
+    let box_rect = Rect::new(x, y - 2.0 * s, 28.0 * s, 28.0 * s);
+    quads.push(Quad::rounded(box_rect, alpha(theme.foreground, 0.045), 7.0 * s));
+    quads.push(Quad::rounded(box_rect, alpha(theme.border, 0.58), 7.0 * s));
+    let cx = box_rect.x + box_rect.w * 0.5;
+    let cy = box_rect.y + box_rect.h * 0.5;
+    let ink = alpha(theme.accent, 0.94);
+    match icon {
+        InspectorIcon::Shell => {
+            outline(
+                quads,
+                Rect::new(cx - 6.0 * s, cy - 5.0 * s, 12.0 * s, 9.0 * s),
+                theme.accent,
+                1.0 * s,
+                s,
+            );
+            quads.push(Quad::rounded(
+                Rect::new(cx - 3.0 * s, cy - 1.5 * s, 3.0 * s, 1.0 * s),
+                ink,
+                0.5 * s,
+            ));
+        }
+        InspectorIcon::Code => {
+            text.push(
+                TextBlock::new(
+                    "<>",
+                    Rect::new(cx - 8.0 * s, cy - 6.0 * s, 16.0 * s, 12.0 * s),
+                    8.4 * s,
+                    theme.accent,
+                )
+                .align(TextAlign::Center)
+                .weight(Weight::SEMIBOLD)
+                .width(16.0 * s),
+            );
+        }
+        InspectorIcon::Display => {
+            outline(
+                quads,
+                Rect::new(cx - 6.5 * s, cy - 5.5 * s, 13.0 * s, 9.0 * s),
+                theme.accent,
+                1.0 * s,
+                s,
+            );
+            quads.push(Quad::rounded(
+                Rect::new(cx - 3.0 * s, cy + 4.5 * s, 6.0 * s, 1.2 * s),
+                ink,
+                0.6 * s,
+            ));
+        }
+        InspectorIcon::Swatch => {
+            quads.push(Quad::rounded(
+                Rect::new(cx - 5.0 * s, cy - 5.0 * s, 4.5 * s, 10.0 * s),
+                Rgba::opaque(theme.ansi[4]),
+                2.0 * s,
+            ));
+            quads.push(Quad::rounded(
+                Rect::new(cx - 0.5 * s, cy - 5.0 * s, 4.5 * s, 10.0 * s),
+                Rgba::opaque(theme.ansi[5]),
+                2.0 * s,
+            ));
+            quads.push(Quad::rounded(
+                Rect::new(cx + 4.0 * s, cy - 5.0 * s, 4.5 * s, 10.0 * s),
+                Rgba::opaque(theme.ansi[6]),
+                2.0 * s,
+            ));
+        }
+        InspectorIcon::Shield => {
+            outline(
+                quads,
+                Rect::new(cx - 5.0 * s, cy - 6.0 * s, 10.0 * s, 9.0 * s),
+                theme.accent,
+                1.0 * s,
+                s,
+            );
+            quads.push(Quad::rounded(
+                Rect::new(cx - 1.5 * s, cy + 3.0 * s, 3.0 * s, 2.0 * s),
+                ink,
+                1.0 * s,
+            ));
+        }
+    }
+
+    text.push(
+        TextBlock::new(
+            label,
+            Rect::new(x + 38.0 * s, y + 1.0 * s, w - 38.0 * s, 11.0 * s),
+            7.4 * s,
+            theme.muted,
+        )
+        .width((w - 38.0 * s).max(1.0)),
+    );
+    text.push(
+        TextBlock::new(
+            truncate(value, 22),
+            Rect::new(x + 38.0 * s, y + 14.0 * s, w - 38.0 * s, 14.0 * s),
+            9.2 * s,
+            theme.foreground,
+        )
+        .weight(Weight::MEDIUM)
+        .width((w - 38.0 * s).max(1.0)),
+    );
+}
+
 fn paint_title_bar(
     quads: &mut Vec<Quad>,
     text: &mut Vec<TextBlock>,
@@ -532,29 +906,29 @@ fn paint_title_bar(
         0.0,
     ));
 
-    let mark = Rect::new(14.0 * s, 6.0 * s, 24.0 * s, 24.0 * s);
+    let mark = Rect::new(14.0 * s, 4.0 * s, 28.0 * s, 28.0 * s);
     paint_mark(quads, images, mark, theme, s);
 
     text.push(
         TextBlock::new(
             "FARMAN",
-            Rect::new(46.0 * s, 9.0 * s, 76.0 * s, 16.0 * s),
-            11.5 * s,
+            Rect::new(50.0 * s, 7.0 * s, 92.0 * s, 19.0 * s),
+            13.0 * s,
             theme.foreground,
         )
         .weight(Weight::BOLD)
-        .width(76.0 * s),
+        .width(92.0 * s),
     );
     quads.push(Quad::rounded(
-        Rect::new(118.0 * s, 12.0 * s, 1.0 * s, 12.0 * s),
+        Rect::new(146.0 * s, 11.0 * s, 1.0 * s, 14.0 * s),
         alpha(theme.border, 0.9),
         0.0,
     ));
     text.push(
         TextBlock::new(
-            "TERMINAL",
-            Rect::new(127.0 * s, 12.0 * s, 74.0 * s, 12.0 * s),
-            7.5 * s,
+            "Terminal",
+            Rect::new(156.0 * s, 11.0 * s, 74.0 * s, 13.0 * s),
+            8.6 * s,
             theme.muted,
         )
         .weight(Weight::MEDIUM)
@@ -563,7 +937,7 @@ fn paint_title_bar(
 
     let button_w = WINDOW_BUTTON_W * s;
     let controls_left = width - button_w * 3.0 - 10.0 * s;
-    let search_start = 205.0 * s;
+    let search_start = 226.0 * s;
     let search_avail = controls_left - search_start - 10.0 * s;
     if search_avail > 170.0 * s {
         let pill_w = (270.0 * s).min(search_avail);
@@ -576,7 +950,7 @@ fn paint_title_bar(
         let hot = pill.contains(mouse.0, mouse.1);
         quads.push(Quad::rounded(
             pill,
-            alpha(if hot { theme.accent } else { theme.border }, 0.55),
+            alpha(if hot { theme.accent } else { theme.border }, 0.72),
             7.0 * s,
         ));
         quads.push(Quad::rounded(
@@ -587,15 +961,25 @@ fn paint_title_bar(
                 (pill.h - 2.0 * s).max(1.0),
             ),
             alpha(
-                theme.foreground,
-                if hot { 0.075 } else { 0.040 },
+                theme.header_bg.blend(theme.accent, if hot { 0.10 } else { 0.04 }),
+                0.96,
             ),
             6.0 * s,
         ));
         quads.push(Quad::rounded(
-            Rect::new(pill.x + 11.0 * s, pill.y + 6.0 * s, 2.0 * s, 10.0 * s),
+            Rect::new(pill.x + 11.0 * s, pill.y + 6.0 * s, 8.0 * s, 8.0 * s),
             alpha(if hot { theme.accent } else { theme.muted }, 0.90),
-            1.0 * s,
+            4.0 * s,
+        ));
+        quads.push(Quad::rounded(
+            Rect::new(pill.x + 12.5 * s, pill.y + 7.5 * s, 5.0 * s, 5.0 * s),
+            alpha(theme.header_bg, 0.98),
+            2.5 * s,
+        ));
+        quads.push(Quad::rounded(
+            Rect::new(pill.x + 17.5 * s, pill.y + 12.5 * s, 1.5 * s, 4.0 * s),
+            alpha(if hot { theme.accent } else { theme.muted }, 0.90),
+            0.75 * s,
         ));
         let badge = Rect::new(
             pill.right() - 46.0 * s,
@@ -838,7 +1222,7 @@ fn paint_toolbar(
     let available = (tab_area_end - rects.tabs_start).max(1.0);
     let count = tabs.len().max(1) as f32;
     let tab_w = (available / count)
-        .clamp(84.0 * s, 190.0 * s)
+        .clamp(96.0 * s, 212.0 * s)
         .min(available);
     let mut x = rects.tabs_start;
     for (index, tab) in tabs.iter().enumerate() {
@@ -899,13 +1283,13 @@ fn paint_tab(
     if selected {
         quads.push(Quad::glass(
             rect,
-            alpha(theme.panel_alt.blend(theme.accent, 0.10), 0.96),
-            alpha(theme.panel_bg.blend(theme.accent, 0.05), 0.94),
+            alpha(theme.header_active.blend(theme.accent, 0.06), 0.96),
+            alpha(theme.panel_bg.blend(theme.header_bg, 0.40), 0.94),
             9.0 * s,
         ));
         quads.push(Quad::rounded(
             Rect::new(rect.x + 10.0 * s, rect.bottom() - 1.4 * s, (rect.w - 20.0 * s).max(1.0), 1.4 * s),
-            alpha(theme.accent, 0.55),
+            alpha(theme.accent, 0.70),
             0.7 * s,
         ));
     } else if hovered {
@@ -913,7 +1297,7 @@ fn paint_tab(
     }
     quads.push(Quad::rounded(
         rect,
-        alpha(if selected { theme.accent } else { theme.border }, if selected { 0.22 } else { 0.45 }),
+        alpha(theme.border, if selected { 0.58 } else { 0.45 }),
         9.0 * s,
     ));
     quads.push(Quad::rounded(
@@ -1250,20 +1634,64 @@ fn paint_status_bar(
         )
         .width((rect.w * 0.55).max(80.0)),
     );
-    let info = format!(
-        "{cols} × {rows}   UTF-8   Bidi {}",
-        if bidi_enabled { "auto" } else { "off" }
-    );
-    let info_w = 210.0 * s;
+    let right = rect.right() - 14.0 * s;
+    let rtl_w = 88.0 * s;
+    let rtl_x = right - rtl_w;
+    let sep1 = rtl_x - 12.0 * s;
+    let utf_w = 42.0 * s;
+    let utf_x = sep1 - 8.0 * s - utf_w;
+    let sep2 = utf_x - 12.0 * s;
+    let grid_w = 70.0 * s;
+    let grid_x = sep2 - 8.0 * s - grid_w;
+
     text.push(
         TextBlock::new(
-            info,
-            Rect::new(rect.right() - info_w - 14.0 * s, rect.y + 6.0 * s, info_w, 14.0 * s),
-            8.4 * s,
+            format!("{cols} x {rows}"),
+            Rect::new(grid_x, rect.y + 6.0 * s, grid_w, 14.0 * s),
+            8.2 * s,
             theme.muted,
         )
         .align(TextAlign::Right)
-        .width(info_w),
+        .width(grid_w),
+    );
+    quads.push(Quad::rounded(
+        Rect::new(sep2, rect.y + 8.0 * s, 1.0 * s, 10.0 * s),
+        alpha(theme.border, 0.75),
+        0.0,
+    ));
+    text.push(
+        TextBlock::new(
+            "UTF-8",
+            Rect::new(utf_x, rect.y + 6.0 * s, utf_w, 14.0 * s),
+            8.2 * s,
+            theme.muted,
+        )
+        .align(TextAlign::Right)
+        .width(utf_w),
+    );
+    quads.push(Quad::rounded(
+        Rect::new(sep1, rect.y + 8.0 * s, 1.0 * s, 10.0 * s),
+        alpha(theme.border, 0.75),
+        0.0,
+    ));
+    let rtl_color = if bidi_enabled {
+        theme.accent
+    } else {
+        theme.muted.scale(0.9)
+    };
+    quads.push(Quad::rounded(
+        Rect::new(rtl_x, rect.y + 11.0 * s, 4.0 * s, 4.0 * s),
+        Rgba::opaque(rtl_color),
+        2.0 * s,
+    ));
+    text.push(
+        TextBlock::new(
+            if bidi_enabled { "RTL support" } else { "RTL off" },
+            Rect::new(rtl_x + 10.0 * s, rect.y + 6.0 * s, rtl_w - 10.0 * s, 14.0 * s),
+            8.2 * s,
+            rtl_color,
+        )
+        .width(rtl_w - 10.0 * s),
     );
 }
 
@@ -1760,6 +2188,136 @@ fn paint_palette(
 }
 
 #[allow(clippy::too_many_arguments)]
+fn paint_theme_card(
+    quads: &mut Vec<Quad>,
+    text: &mut Vec<TextBlock>,
+    hits: &mut Vec<HitRegion>,
+    rect: Rect,
+    name: &'static str,
+    selected_name: &str,
+    mouse: (f32, f32),
+    s: f32,
+) {
+    let Some(preview) = Theme::by_name(name) else {
+        return;
+    };
+    let selected = name == selected_name;
+    let hovered = rect.contains(mouse.0, mouse.1);
+    let border = if selected {
+        preview.accent
+    } else if hovered {
+        preview.muted
+    } else {
+        preview.border
+    };
+    quads.push(Quad::rounded(
+        rect,
+        alpha(border, if selected { 0.92 } else { 0.62 }),
+        9.0 * s,
+    ));
+    let body = rect.inset(1.0 * s, 1.0 * s);
+    quads.push(Quad::glass(
+        body,
+        alpha(preview.header_bg, if hovered { 0.98 } else { 0.92 }),
+        alpha(preview.background, 0.96),
+        8.0 * s,
+    ));
+
+    let swatch = Rect::new(
+        body.x + 7.0 * s,
+        body.y + 7.0 * s,
+        (body.w - 14.0 * s).max(1.0),
+        23.0 * s,
+    );
+    quads.push(Quad::glass(
+        swatch,
+        alpha(preview.header_active, 0.95),
+        alpha(preview.background.scale(0.92), 0.98),
+        5.0 * s,
+    ));
+    quads.push(Quad::rounded(
+        Rect::new(swatch.x + 7.0 * s, swatch.y + 9.0 * s, 22.0 * s, 5.0 * s),
+        alpha(preview.accent, 0.95),
+        2.5 * s,
+    ));
+    quads.push(Quad::rounded(
+        Rect::new(swatch.x + 33.0 * s, swatch.y + 9.0 * s, 11.0 * s, 5.0 * s),
+        alpha(preview.accent_violet, 0.88),
+        2.5 * s,
+    ));
+    for (index, color) in [preview.ansi[1], preview.ansi[2], preview.ansi[4]]
+        .into_iter()
+        .enumerate()
+    {
+        quads.push(Quad::rounded(
+            Rect::new(
+                swatch.right() - 18.0 * s - index as f32 * 10.0 * s,
+                swatch.y + 8.0 * s,
+                6.0 * s,
+                6.0 * s,
+            ),
+            Rgba::opaque(color),
+            3.0 * s,
+        ));
+    }
+
+    if selected {
+        quads.push(Quad::rounded(
+            Rect::new(rect.x + 1.0 * s, rect.y + 13.0 * s, 2.0 * s, 36.0 * s),
+            alpha(preview.accent, 0.96),
+            1.0 * s,
+        ));
+    }
+
+    text.push(
+        TextBlock::new(
+            preview.display_name,
+            Rect::new(
+                body.x + 12.0 * s,
+                body.y + 35.0 * s,
+                body.w - 32.0 * s,
+                12.0 * s,
+            ),
+            8.8 * s,
+            preview.foreground,
+        )
+        .weight(Weight::MEDIUM)
+        .width((body.w - 32.0 * s).max(1.0)),
+    );
+    if selected {
+        quads.push(Quad::rounded(
+            Rect::new(
+                body.right() - 15.0 * s,
+                body.y + 38.0 * s,
+                5.0 * s,
+                5.0 * s,
+            ),
+            Rgba::opaque(preview.accent),
+            2.5 * s,
+        ));
+    }
+    text.push(
+        TextBlock::new(
+            preview.description,
+            Rect::new(
+                body.x + 12.0 * s,
+                body.y + 48.0 * s,
+                body.w - 24.0 * s,
+                10.0 * s,
+            ),
+            7.3 * s,
+            preview.muted,
+        )
+        .width((body.w - 24.0 * s).max(1.0)),
+    );
+
+    hits.push(HitRegion {
+        rect,
+        action: UiAction::SetTheme(name.to_owned()),
+    });
+}
+
+#[allow(clippy::too_many_arguments)]
 fn paint_settings(
     quads: &mut Vec<Quad>,
     text: &mut Vec<TextBlock>,
@@ -1777,8 +2335,8 @@ fn paint_settings(
     mouse: (f32, f32),
     s: f32,
 ) {
-    let panel_w = (520.0 * s).min((width - 32.0 * s).max(1.0));
-    let panel_h = (504.0 * s).min((height - 32.0 * s).max(1.0));
+    let panel_w = (660.0 * s).min((width - 32.0 * s).max(1.0));
+    let panel_h = (632.0 * s).min((height - 32.0 * s).max(1.0));
     let panel = Rect::new(
         (width - panel_w) * 0.5,
         (height - panel_h) * 0.5,
@@ -1852,44 +2410,40 @@ fn paint_settings(
         0.0,
     ));
 
-    let mut y = panel.y + 86.0 * s;
+    let mut y = panel.y + 84.0 * s;
+    section_label(text, "THEMES", x, y, w, theme, s);
+    text.push(
+        TextBlock::new(
+            "Choose a color scheme - changes apply instantly.",
+            Rect::new(x + 72.0 * s, y - 2.0 * s, w - 72.0 * s, 12.0 * s),
+            7.8 * s,
+            theme.muted,
+        )
+        .align(TextAlign::Right)
+        .width(w - 72.0 * s),
+    );
+    y += 16.0 * s;
+
+    let gap = 10.0 * s;
+    let card_w = ((w - gap * 2.0) / 3.0).max(1.0);
+    let card_h = 62.0 * s;
+    for (index, name) in Theme::NAMES.iter().enumerate() {
+        let column = index % 3;
+        let row = index / 3;
+        let rect = Rect::new(
+            x + column as f32 * (card_w + gap),
+            y + row as f32 * (card_h + gap),
+            card_w,
+            card_h,
+        );
+        paint_theme_card(quads, text, hits, rect, name, theme_name, mouse, s);
+    }
+    y += card_h * 2.0 + gap + 14.0 * s;
+
+    divider(quads, x, y, w, theme, s);
+    y += 18.0 * s;
     section_label(text, "APPEARANCE", x, y, w, theme, s);
     y += 18.0 * s;
-
-    setting_label(
-        text,
-        "Theme",
-        "Interface color scheme",
-        x,
-        y,
-        w - 292.0 * s,
-        theme,
-        s,
-    );
-    let control_x = right - 276.0 * s;
-    let button_w = 88.0 * s;
-    for (index, name) in Theme::NAMES.iter().enumerate() {
-        let rect = Rect::new(
-            control_x + index as f32 * (button_w + 6.0 * s),
-            y + 3.0 * s,
-            button_w,
-            28.0 * s,
-        );
-        let selected = *name == theme_name;
-        select_button(
-            quads,
-            text,
-            hits,
-            rect,
-            Theme::display_name_for(name),
-            UiAction::SetTheme((*name).to_owned()),
-            selected,
-            theme,
-            mouse,
-            s,
-        );
-    }
-    y += 44.0 * s;
 
     setting_label(
         text,
@@ -2163,48 +2717,6 @@ fn paint_toggle(quads: &mut Vec<Quad>, rect: Rect, on: bool, theme: &Theme, s: f
 }
 
 #[allow(clippy::too_many_arguments)]
-fn select_button(
-    quads: &mut Vec<Quad>,
-    text: &mut Vec<TextBlock>,
-    hits: &mut Vec<HitRegion>,
-    rect: Rect,
-    label: &str,
-    action: UiAction,
-    selected: bool,
-    theme: &Theme,
-    mouse: (f32, f32),
-    s: f32,
-) {
-    let hot = rect.contains(mouse.0, mouse.1);
-    quads.push(Quad::rounded(
-        rect,
-        if selected {
-            alpha(theme.accent, 0.20)
-        } else {
-            alpha(theme.foreground, if hot { 0.075 } else { 0.035 })
-        },
-        7.0 * s,
-    ));
-    quads.push(Quad::rounded(
-        rect,
-        alpha(if selected { theme.accent } else { theme.border }, if selected { 0.55 } else { 0.65 }),
-        7.0 * s,
-    ));
-    text.push(
-        TextBlock::new(
-            label,
-            Rect::new(rect.x + 2.0 * s, rect.y + 7.0 * s, rect.w - 4.0 * s, 14.0 * s),
-            8.2 * s,
-            if selected { theme.foreground } else { theme.dim_foreground },
-        )
-        .align(TextAlign::Center)
-        .weight(if selected { Weight::MEDIUM } else { Weight::NORMAL })
-        .width(rect.w - 4.0 * s),
-    );
-    hits.push(HitRegion { rect, action });
-}
-
-#[allow(clippy::too_many_arguments)]
 fn small_button(
     quads: &mut Vec<Quad>,
     text: &mut Vec<TextBlock>,
@@ -2362,7 +2874,7 @@ mod tests {
     fn terminal_rect_dominates_window() {
         let rect = terminal_rect(1280.0, 800.0, 1.0);
         assert!(rect.h > 600.0);
-        assert!(rect.w > 1180.0);
+        assert!(rect.w > 950.0);
     }
 
     #[test]
@@ -2463,14 +2975,28 @@ mod tests {
             .hits
             .iter()
             .any(|h| matches!(h.action, UiAction::CloseOverlay)));
+        assert!(chrome
+            .hits
+            .iter()
+            .any(|h| matches!(h.action, UiAction::SetTheme(ref name) if name == "aurora")));
+        assert!(chrome.text.iter().any(|block| block.text == "THEMES"));
     }
 
     #[test]
     fn palette_filters_commands_by_all_terms() {
         assert_eq!(palette_matches("").len(), PALETTE_ITEMS.len());
         let themes = palette_matches("theme");
-        assert_eq!(themes.len(), 3);
+        assert_eq!(themes.len(), Theme::NAMES.len());
         assert!(themes.iter().all(|item| item.title.contains("Theme")));
+        assert!(palette_matches("aurora")
+            .iter()
+            .any(|item| item.command == PaletteCommand::ThemeAurora));
+        assert!(palette_matches("nord")
+            .iter()
+            .any(|item| item.command == PaletteCommand::ThemeNord));
+        assert!(palette_matches("ember")
+            .iter()
+            .any(|item| item.command == PaletteCommand::ThemeEmber));
         assert!(palette_matches("midnight")
             .iter()
             .any(|item| item.command == PaletteCommand::ThemeMidnight));
