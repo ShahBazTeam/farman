@@ -1,0 +1,55 @@
+name: Feature request
+description: Suggest a focused improvement for FARMAN Terminal.
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please keep requests focused. Explain the problem first, then the
+        smallest change that would solve it.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to do, and what is missing today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Persian/Arabic shaping and bidi
+        - Terminal emulation or ConPTY
+        - UI, themes or command palette
+        - Profiles, config or shortcuts
+        - Installer and packaging
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, terminal applications, or related projects.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and discussions.
+          required: true
+        - label: This request does not require telemetry or network access.
+          required: true

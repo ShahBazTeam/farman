@@ -1,0 +1,82 @@
+name: Bug report
+description: Report a reproducible problem in FARMAN Terminal.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For security problems, use the Security tab instead.
+        Do not paste tokens, private paths, or sensitive shell output.
+  - type: input
+    id: version
+    attributes:
+      label: FARMAN version
+      description: Visible in Settings, or the release asset name.
+      placeholder: "0.3.0"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and display scale
+      placeholder: "Windows 11 23H2, 150%"
+    validations:
+      required: true
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Shell profile
+      options:
+        - Windows PowerShell
+        - PowerShell 7
+        - Command Prompt
+        - WSL
+        - Custom profile
+        - Not applicable
+    validations:
+      required: true
+  - type: checkboxes
+    id: rtl
+    attributes:
+      label: RTL context
+      options:
+        - label: The issue involves Persian or Arabic text
+        - label: A Persian/RTL keyboard layout or IME was active
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Open ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and screenshots
+      description: Redact secrets and private paths before attaching.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: I removed secrets and private data from logs.
+          required: true

@@ -40,10 +40,103 @@ pub enum UiAction {
     CycleDefaultProfile,
     ToggleBidi,
     ReloadConfig,
+    TogglePalette,
     MinimizeWindow,
     ToggleMaximize,
     CloseWindow,
     Noop,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PaletteCommand {
+    NewTab,
+    Settings,
+    ThemeDark,
+    ThemeMidnight,
+    ThemeGraphite,
+    Bidi,
+    Profiles,
+    Reload,
+}
+
+impl PaletteCommand {
+    pub fn action(self) -> UiAction {
+        match self {
+            Self::NewTab => UiAction::NewTab(None),
+            Self::Settings => UiAction::ToggleSettings,
+            Self::ThemeDark => UiAction::SetTheme("farman-dark".to_owned()),
+            Self::ThemeMidnight => UiAction::SetTheme("midnight".to_owned()),
+            Self::ThemeGraphite => UiAction::SetTheme("graphite".to_owned()),
+            Self::Bidi => UiAction::ToggleBidi,
+            Self::Profiles => UiAction::ToggleProfileMenu,
+            Self::Reload => UiAction::ReloadConfig,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct PaletteItem {
+    pub title: &'static str,
+    pub hint: &'static str,
+    pub command: PaletteCommand,
+}
+
+const PALETTE_ITEMS: [PaletteItem; 8] = [
+    PaletteItem {
+        title: "New tab",
+        hint: "Ctrl+Shift+T",
+        command: PaletteCommand::NewTab,
+    },
+    PaletteItem {
+        title: "Settings",
+        hint: "Ctrl+,",
+        command: PaletteCommand::Settings,
+    },
+    PaletteItem {
+        title: "Theme: FARMAN Dark",
+        hint: "Default",
+        command: PaletteCommand::ThemeDark,
+    },
+    PaletteItem {
+        title: "Theme: Midnight",
+        hint: "Blue",
+        command: PaletteCommand::ThemeMidnight,
+    },
+    PaletteItem {
+        title: "Theme: Graphite",
+        hint: "Neutral",
+        command: PaletteCommand::ThemeGraphite,
+    },
+    PaletteItem {
+        title: "Toggle bidi shaping",
+        hint: "Persian / Arabic",
+        command: PaletteCommand::Bidi,
+    },
+    PaletteItem {
+        title: "Choose default shell",
+        hint: "Profiles",
+        command: PaletteCommand::Profiles,
+    },
+    PaletteItem {
+        title: "Reload configuration",
+        hint: "config.toml",
+        command: PaletteCommand::Reload,
+    },
+];
+
+pub fn palette_matches(query: &str) -> Vec<PaletteItem> {
+    let terms: Vec<String> = query
+        .split_whitespace()
+        .map(|term| term.to_lowercase())
+        .collect();
+    PALETTE_ITEMS
+        .iter()
+        .filter(|item| {
+            let haystack = format!("{} {}", item.title, item.hint).to_lowercase();
+            terms.iter().all(|term| haystack.contains(term))
+        })
+        .copied()
+        .collect()
 }
 
 #[derive(Debug, Clone)]
@@ -61,6 +154,9 @@ pub struct ChromeInput<'a> {
     pub active: usize,
     pub settings_open: bool,
     pub profile_menu_open: bool,
+    pub palette_open: bool,
+    pub palette_query: &'a str,
+    pub palette_selected: usize,
     pub profiles: &'a [Profile],
     pub selected_profile: &'a str,
     pub font_size: f32,
@@ -177,6 +273,9 @@ pub fn build(input: ChromeInput<'_>) -> Chrome {
         active,
         settings_open,
         profile_menu_open,
+        palette_open,
+        palette_query,
+        palette_selected,
         profiles,
         selected_profile,
         font_size,
@@ -242,7 +341,7 @@ pub fn build(input: ChromeInput<'_>) -> Chrome {
             mouse,
             s,
         );
-    } else if let Some(banner) = session_banner {
+    } else if let Some(banner) = session_banner.filter(|_| !palette_open) {
         paint_session_banner(
             &mut overlay_quads,
             &mut base_text,
@@ -253,7 +352,7 @@ pub fn build(input: ChromeInput<'_>) -> Chrome {
             banner,
             s,
         );
-    } else if starting {
+    } else if starting && !palette_open {
         paint_starting_pill(
             &mut overlay_quads,
             &mut base_text,
@@ -276,7 +375,7 @@ pub fn build(input: ChromeInput<'_>) -> Chrome {
         s,
     );
 
-    if let Some(message) = toast {
+    if let Some(message) = toast.filter(|_| !palette_open) {
         paint_toast(
             &mut overlay_quads,
             &mut base_text,
@@ -287,7 +386,7 @@ pub fn build(input: ChromeInput<'_>) -> Chrome {
         );
     }
 
-    if !settings_open {
+    if !settings_open && !palette_open {
         text.extend(base_text);
     }
 
@@ -329,6 +428,21 @@ pub fn build(input: ChromeInput<'_>) -> Chrome {
         );
     }
 
+    if palette_open {
+        paint_palette(
+            &mut overlay_quads,
+            &mut text,
+            &mut hits,
+            width,
+            height,
+            theme,
+            palette_query,
+            palette_selected,
+            mouse,
+            s,
+        );
+    }
+
     let drag_region = Rect::new(
         170.0 * s,
         0.0,
@@ -350,23 +464,19 @@ fn alpha(color: Rgb, value: f32) -> Rgba {
     Rgba::with_alpha(color, value)
 }
 
-fn paint_backdrop(quads: &mut Vec<Quad>, width: f32, height: f32, theme: &Theme, s: f32) {
+fn paint_backdrop(
+    quads: &mut Vec<Quad>,
+    width: f32,
+    height: f32,
+    theme: &Theme,
+    s: f32,
+) {
     let top = theme.background.blend(theme.header_bg, 0.55);
     let bottom = theme.background.scale(0.42);
     quads.push(Quad::glass(
         Rect::new(0.0, 0.0, width, height),
         Rgba::opaque(top),
         Rgba::opaque(bottom),
-        0.0,
-    ));
-    quads.push(Quad::glow(
-        Rect::new(-width * 0.32, -height * 0.55, width * 0.95, height * 1.2),
-        alpha(theme.accent, 0.028),
-        0.0,
-    ));
-    quads.push(Quad::glow(
-        Rect::new(width * 0.52, -height * 0.2, width * 0.7, height * 0.9),
-        alpha(theme.accent_violet, 0.018),
         0.0,
     ));
     let border = alpha(theme.border, 0.45);
@@ -446,6 +556,84 @@ fn paint_title_bar(
     );
 
     let button_w = WINDOW_BUTTON_W * s;
+    let controls_left = width - button_w * 3.0 - 10.0 * s;
+    let search_start = 205.0 * s;
+    let search_avail = controls_left - search_start - 10.0 * s;
+    if search_avail > 170.0 * s {
+        let pill_w = (270.0 * s).min(search_avail);
+        let pill = Rect::new(
+            search_start + (search_avail - pill_w) * 0.5,
+            7.0 * s,
+            pill_w,
+            22.0 * s,
+        );
+        let hot = pill.contains(mouse.0, mouse.1);
+        quads.push(Quad::rounded(
+            pill,
+            alpha(if hot { theme.accent } else { theme.border }, 0.55),
+            7.0 * s,
+        ));
+        quads.push(Quad::rounded(
+            Rect::new(
+                pill.x + 1.0 * s,
+                pill.y + 1.0 * s,
+                (pill.w - 2.0 * s).max(1.0),
+                (pill.h - 2.0 * s).max(1.0),
+            ),
+            alpha(
+                theme.foreground,
+                if hot { 0.075 } else { 0.040 },
+            ),
+            6.0 * s,
+        ));
+        quads.push(Quad::rounded(
+            Rect::new(pill.x + 11.0 * s, pill.y + 6.0 * s, 2.0 * s, 10.0 * s),
+            alpha(if hot { theme.accent } else { theme.muted }, 0.90),
+            1.0 * s,
+        ));
+        let badge = Rect::new(
+            pill.right() - 46.0 * s,
+            pill.y + 4.0 * s,
+            38.0 * s,
+            14.0 * s,
+        );
+        quads.push(Quad::rounded(
+            badge,
+            alpha(theme.foreground, 0.055),
+            4.0 * s,
+        ));
+        text.push(
+            TextBlock::new(
+                "Search commands",
+                Rect::new(
+                    pill.x + 22.0 * s,
+                    pill.y + 5.0 * s,
+                    (badge.x - pill.x - 30.0 * s).max(1.0),
+                    12.0 * s,
+                ),
+                8.6 * s,
+                if hot { theme.foreground } else { theme.muted },
+            )
+            .weight(Weight::MEDIUM)
+            .width((badge.x - pill.x - 30.0 * s).max(1.0)),
+        );
+        text.push(
+            TextBlock::new(
+                "Ctrl K",
+                Rect::new(badge.x, badge.y + 1.0 * s, badge.w, 12.0 * s),
+                7.2 * s,
+                theme.muted,
+            )
+            .align(TextAlign::Center)
+            .weight(Weight::MEDIUM)
+            .width(badge.w),
+        );
+        hits.push(HitRegion {
+            rect: pill,
+            action: UiAction::TogglePalette,
+        });
+    }
+
     let close = Rect::new(width - button_w, 0.0, button_w, title.h);
     let max = Rect::new(width - button_w * 2.0, 0.0, button_w, title.h);
     let min = Rect::new(width - button_w * 3.0, 0.0, button_w, title.h);
@@ -996,7 +1184,7 @@ fn paint_empty_state(
     );
     text.push(
         TextBlock::new(
-            "Ctrl+Shift+T   Ctrl+,",
+            "Ctrl+Shift+T   Ctrl+,   Ctrl+K",
             Rect::new(cx - 160.0 * s, center_y + 108.0 * s, 320.0 * s, 12.0 * s),
             8.0 * s,
             theme.muted.scale(0.86),
@@ -1358,6 +1546,238 @@ fn paint_profile_menu(
         rect: footer,
         action: UiAction::ToggleSettings,
     });
+}
+
+#[allow(clippy::too_many_arguments)]
+fn paint_palette(
+    quads: &mut Vec<Quad>,
+    text: &mut Vec<TextBlock>,
+    hits: &mut Vec<HitRegion>,
+    width: f32,
+    height: f32,
+    theme: &Theme,
+    query: &str,
+    selected: usize,
+    mouse: (f32, f32),
+    s: f32,
+) {
+    let matches = palette_matches(query);
+    let rows = matches.len().max(1);
+    let row_h = 34.0 * s;
+    let panel_w = (560.0 * s).min((width - 36.0 * s).max(1.0));
+    let panel_h = (112.0 * s + rows as f32 * row_h).min((height - 36.0 * s).max(1.0));
+    let panel = Rect::new(
+        (width - panel_w) * 0.5,
+        ((height - panel_h) * 0.42).max(18.0 * s),
+        panel_w,
+        panel_h,
+    );
+
+    quads.push(Quad::rounded(
+        Rect::new(0.0, 0.0, width, height),
+        alpha(theme.background, 0.92),
+        0.0,
+    ));
+    hits.push(HitRegion {
+        rect: Rect::new(0.0, 0.0, width, height),
+        action: UiAction::CloseOverlay,
+    });
+
+    glass_card(quads, panel, theme, 16.0 * s, true, s);
+    hits.push(HitRegion {
+        rect: panel,
+        action: UiAction::Noop,
+    });
+
+    quads.push(Quad::glass(
+        Rect::new(
+            panel.x + 20.0 * s,
+            panel.y + 1.0 * s,
+            (panel.w - 40.0 * s).max(1.0),
+            1.6 * s,
+        ),
+        alpha(theme.accent, 0.72),
+        alpha(theme.accent_violet, 0.10),
+        1.0 * s,
+    ));
+
+    let left = panel.x + 20.0 * s;
+    let right = panel.right() - 20.0 * s;
+    let w = (right - left).max(1.0);
+
+    text.push(
+        TextBlock::new(
+            "COMMAND PALETTE",
+            Rect::new(left, panel.y + 17.0 * s, w - 86.0 * s, 12.0 * s),
+            7.8 * s,
+            theme.muted,
+        )
+        .weight(Weight::SEMIBOLD)
+        .width((w - 86.0 * s).max(1.0)),
+    );
+    text.push(
+        TextBlock::new(
+            "ESC",
+            Rect::new(right - 34.0 * s, panel.y + 15.0 * s, 34.0 * s, 14.0 * s),
+            7.0 * s,
+            theme.muted.scale(0.92),
+        )
+        .align(TextAlign::Right)
+        .weight(Weight::MEDIUM)
+        .width(34.0 * s),
+    );
+
+    let search = Rect::new(left, panel.y + 38.0 * s, w, 40.0 * s);
+    quads.push(Quad::rounded(search, alpha(theme.border, 0.70), 9.0 * s));
+    quads.push(Quad::rounded(
+        Rect::new(
+            search.x + 1.0 * s,
+            search.y + 1.0 * s,
+            (search.w - 2.0 * s).max(1.0),
+            (search.h - 2.0 * s).max(1.0),
+        ),
+        alpha(theme.background, 0.62),
+        8.0 * s,
+    ));
+    quads.push(Quad::rounded(
+        Rect::new(
+            search.x + 12.0 * s,
+            search.y + 11.0 * s,
+            2.0 * s,
+            18.0 * s,
+        ),
+        alpha(theme.accent, 0.92),
+        1.0 * s,
+    ));
+    let query_text = if query.is_empty() {
+        "Type a command..."
+    } else {
+        query
+    };
+    text.push(
+        TextBlock::new(
+            query_text,
+            Rect::new(
+                search.x + 22.0 * s,
+                search.y + 11.0 * s,
+                (search.w - 36.0 * s).max(1.0),
+                16.0 * s,
+            ),
+            10.5 * s,
+            if query.is_empty() {
+                theme.muted.scale(0.9)
+            } else {
+                theme.foreground
+            },
+        )
+        .weight(Weight::MEDIUM)
+        .width((search.w - 36.0 * s).max(1.0)),
+    );
+    if !matches.is_empty() {
+        let caret_x = (search.x
+            + 22.0 * s
+            + query.chars().count() as f32 * 5.45 * s
+            + 1.0 * s)
+            .min(search.right() - 14.0 * s);
+        quads.push(Quad::rounded(
+            Rect::new(caret_x, search.y + 12.0 * s, 1.5 * s, 16.0 * s),
+            alpha(theme.accent, 0.90),
+            0.75 * s,
+        ));
+    }
+
+    let list_top = search.bottom() + 8.0 * s;
+    if matches.is_empty() {
+        text.push(
+            TextBlock::new(
+                "No matching commands",
+                Rect::new(left, list_top + 9.0 * s, w, 16.0 * s),
+                10.0 * s,
+                theme.muted,
+            )
+            .align(TextAlign::Center)
+            .width(w),
+        );
+    } else {
+        for (index, item) in matches.iter().enumerate() {
+            let row = Rect::new(
+                left,
+                list_top + index as f32 * row_h,
+                w,
+                row_h - 2.0 * s,
+            );
+            let hot = row.contains(mouse.0, mouse.1);
+            let active = index == selected;
+            if active || hot {
+                quads.push(Quad::rounded(
+                    row,
+                    if active {
+                        alpha(theme.accent, 0.13)
+                    } else {
+                        alpha(theme.foreground, 0.045)
+                    },
+                    7.0 * s,
+                ));
+            }
+            if active {
+                quads.push(Quad::rounded(
+                    Rect::new(row.x, row.y + 6.0 * s, 2.0 * s, row.h - 12.0 * s),
+                    alpha(theme.accent, 0.95),
+                    1.0 * s,
+                ));
+            }
+            text.push(
+                TextBlock::new(
+                    item.title,
+                    Rect::new(row.x + 14.0 * s, row.y + 8.0 * s, row.w - 146.0 * s, 16.0 * s),
+                    if active { 10.2 } else { 9.8 } * s,
+                    if active { theme.foreground } else { theme.foreground.scale(0.86) },
+                )
+                .weight(if active { Weight::MEDIUM } else { Weight::NORMAL })
+                .width((row.w - 146.0 * s).max(1.0)),
+            );
+            text.push(
+                TextBlock::new(
+                    item.hint,
+                    Rect::new(row.right() - 126.0 * s, row.y + 9.0 * s, 112.0 * s, 14.0 * s),
+                    8.0 * s,
+                    theme.muted,
+                )
+                .align(TextAlign::Right)
+                .width(112.0 * s),
+            );
+            hits.push(HitRegion {
+                rect: row,
+                action: item.command.action(),
+            });
+        }
+    }
+
+    let footer_y = (list_top + rows as f32 * row_h + 8.0 * s).min(panel.bottom() - 22.0 * s);
+    quads.push(Quad::rounded(
+        Rect::new(left, footer_y - 4.0 * s, w, 1.0 * s),
+        alpha(theme.border, 0.70),
+        0.0,
+    ));
+    text.push(
+        TextBlock::new(
+            "Up/Down move    Enter run    Esc close",
+            Rect::new(left, footer_y + 3.0 * s, w - 54.0 * s, 12.0 * s),
+            7.4 * s,
+            theme.muted.scale(0.9),
+        )
+        .width((w - 54.0 * s).max(1.0)),
+    );
+    text.push(
+        TextBlock::new(
+            "Ctrl K",
+            Rect::new(right - 50.0 * s, footer_y + 3.0 * s, 50.0 * s, 12.0 * s),
+            7.4 * s,
+            theme.muted.scale(0.9),
+        )
+        .align(TextAlign::Right)
+        .width(50.0 * s),
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2003,6 +2423,9 @@ mod tests {
             active: 0,
             settings_open: false,
             profile_menu_open: false,
+            palette_open: false,
+            palette_query: "",
+            palette_selected: 0,
             profiles: &profiles,
             selected_profile: "powershell",
             font_size: 16.0,
@@ -2014,7 +2437,7 @@ mod tests {
             toast: None,
             mouse: (0.0, 0.0),
             config_path: "C:\\Users\\Test\\AppData\\Roaming\\FARMAN\\config.toml",
-            version: "v0.2.0",
+            version: "v0.3.0",
             active_profile: "Windows PowerShell",
             starting: false,
             session_banner: None,
@@ -2036,6 +2459,9 @@ mod tests {
             active: 0,
             settings_open: true,
             profile_menu_open: false,
+            palette_open: false,
+            palette_query: "",
+            palette_selected: 0,
             profiles: &[],
             selected_profile: "powershell",
             font_size: 16.0,
@@ -2047,7 +2473,7 @@ mod tests {
             toast: Some("Glass"),
             mouse: (0.0, 0.0),
             config_path: "C:\\FARMAN\\config.toml",
-            version: "v0.2.0",
+            version: "v0.3.0",
             active_profile: "Windows PowerShell",
             starting: false,
             session_banner: None,
@@ -2058,5 +2484,61 @@ mod tests {
             .hits
             .iter()
             .any(|h| matches!(h.action, UiAction::CloseOverlay)));
+    }
+
+    #[test]
+    fn palette_filters_commands_by_all_terms() {
+        assert_eq!(palette_matches("").len(), PALETTE_ITEMS.len());
+        let themes = palette_matches("theme");
+        assert_eq!(themes.len(), 3);
+        assert!(themes.iter().all(|item| item.title.contains("Theme")));
+        assert!(palette_matches("midnight")
+            .iter()
+            .any(|item| item.command == PaletteCommand::ThemeMidnight));
+        assert!(palette_matches("theme blue")
+            .iter()
+            .any(|item| item.command == PaletteCommand::ThemeMidnight));
+        assert!(palette_matches("no-such-command").is_empty());
+    }
+
+    #[test]
+    fn palette_builds_action_hits_above_the_panel() {
+        let chrome = build(ChromeInput {
+            width: 1280.0,
+            height: 800.0,
+            scale: 1.0,
+            theme: &FARMAN_DARK,
+            tabs: &[],
+            active: 0,
+            settings_open: false,
+            profile_menu_open: false,
+            palette_open: true,
+            palette_query: "midnight",
+            palette_selected: 0,
+            profiles: &[],
+            selected_profile: "powershell",
+            font_size: 16.0,
+            theme_name: "farman-dark",
+            bidi_enabled: true,
+            cols: 100,
+            rows: 30,
+            status: "ready",
+            toast: None,
+            mouse: (640.0, 400.0),
+            config_path: "C:\\FARMAN\\config.toml",
+            version: "v0.3.0",
+            active_profile: "Windows PowerShell",
+            starting: false,
+            session_banner: None,
+            maximized: false,
+        });
+        assert!(chrome
+            .hits
+            .iter()
+            .any(|hit| matches!(hit.action, UiAction::SetTheme(ref name) if name == "midnight")));
+        assert!(chrome
+            .text
+            .iter()
+            .any(|block| block.text == "COMMAND PALETTE"));
     }
 }

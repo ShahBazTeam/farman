@@ -13,7 +13,7 @@ use winit::event::{
     ElementState, Ime, KeyEvent, MouseButton as WinitMouseButton, MouseScrollDelta, WindowEvent,
 };
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoopProxy};
-use winit::keyboard::{Key, ModifiersState};
+use winit::keyboard::{Key, KeyCode, ModifiersState, PhysicalKey};
 use winit::window::{CursorIcon, Fullscreen, Icon, ResizeDirection, Window};
 
 #[cfg(windows)]
@@ -226,6 +226,9 @@ pub struct App {
     hover_hit: Option<usize>,
     settings_open: bool,
     profile_menu_open: bool,
+    palette_open: bool,
+    palette_query: String,
+    palette_selected: usize,
     selected_profile: String,
     toast: Option<(String, Instant)>,
     status: String,
@@ -286,6 +289,9 @@ impl App {
             hover_hit: None,
             settings_open: false,
             profile_menu_open: false,
+            palette_open: false,
+            palette_query: String::new(),
+            palette_selected: 0,
             selected_profile,
             toast,
             status,
@@ -526,7 +532,78 @@ impl App {
         self.request_redraw();
     }
 
+    fn toggle_palette(&mut self) {
+        self.palette_open = !self.palette_open;
+        self.settings_open = false;
+        self.profile_menu_open = false;
+        self.palette_query.clear();
+        self.palette_selected = 0;
+        self.request_redraw();
+    }
+
+    fn palette_key(&mut self, event: &KeyEvent) {
+        match &event.logical_key {
+            Key::Named(winit::keyboard::NamedKey::Escape) => {
+                self.palette_open = false;
+                self.palette_query.clear();
+                self.palette_selected = 0;
+            }
+            Key::Named(winit::keyboard::NamedKey::ArrowUp) => {
+                let count = ui::palette_matches(&self.palette_query).len();
+                if count > 0 {
+                    self.palette_selected = (self.palette_selected + count - 1) % count;
+                }
+            }
+            Key::Named(winit::keyboard::NamedKey::ArrowDown) => {
+                let count = ui::palette_matches(&self.palette_query).len();
+                if count > 0 {
+                    self.palette_selected = (self.palette_selected + 1) % count;
+                }
+            }
+            Key::Named(winit::keyboard::NamedKey::Enter) => {
+                self.run_palette();
+                return;
+            }
+            Key::Named(winit::keyboard::NamedKey::Backspace) => {
+                self.palette_query.pop();
+                self.palette_selected = 0;
+            }
+            Key::Character(text)
+                if !self.modifiers.control_key() && !self.modifiers.alt_key() =>
+            {
+                let mut added = false;
+                for ch in text.chars() {
+                    if !ch.is_control() && self.palette_query.chars().count() < 64 {
+                        self.palette_query.push(ch);
+                        added = true;
+                    }
+                }
+                if added {
+                    self.palette_selected = 0;
+                }
+            }
+            _ => {}
+        }
+        self.request_redraw();
+    }
+
+    fn run_palette(&mut self) {
+        let action = ui::palette_matches(&self.palette_query)
+            .get(self.palette_selected)
+            .map(|item| item.command.action());
+        let Some(action) = action else {
+            return;
+        };
+        self.palette_open = false;
+        self.palette_query.clear();
+        self.palette_selected = 0;
+        self.handle_ui_action(action);
+    }
+
     fn handle_ui_action(&mut self, action: UiAction) {
+        if !matches!(action, UiAction::TogglePalette | UiAction::Noop) {
+            self.palette_open = false;
+        }
         match action {
             UiAction::NewTab(profile) => {
                 self.spawn_tab(profile);
@@ -547,6 +624,9 @@ impl App {
             UiAction::CloseOverlay => {
                 self.settings_open = false;
                 self.profile_menu_open = false;
+                self.palette_open = false;
+                self.palette_query.clear();
+                self.palette_selected = 0;
                 self.request_redraw();
             }
             UiAction::FontDelta(delta) => {
@@ -599,6 +679,7 @@ impl App {
                 self.settings_open = false;
                 self.request_redraw();
             }
+            UiAction::TogglePalette => self.toggle_palette(),
             UiAction::MinimizeWindow => {
                 if let Some(window) = &self.window {
                     window.set_minimized(true);
@@ -909,6 +990,20 @@ impl App {
         if event.state != ElementState::Pressed {
             return;
         }
+        if self.modifiers.control_key() && !self.modifiers.alt_key() {
+            let logical_k = matches!(
+                &event.logical_key,
+                Key::Character(text) if text.as_ref().eq_ignore_ascii_case("k")
+            );
+            if logical_k || event.physical_key == PhysicalKey::Code(KeyCode::KeyK) {
+                self.toggle_palette();
+                return;
+            }
+        }
+        if self.palette_open {
+            self.palette_key(&event);
+            return;
+        }
         if self.settings_open || self.profile_menu_open {
             if event.logical_key == Key::Named(winit::keyboard::NamedKey::Escape) {
                 self.settings_open = false;
@@ -941,6 +1036,14 @@ impl App {
     }
 
     fn ime_commit(&mut self, text: &str) {
+        if self.palette_open {
+            if self.palette_query.chars().count() < 64 {
+                self.palette_query.push_str(text);
+                self.palette_selected = 0;
+                self.request_redraw();
+            }
+            return;
+        }
         if self.settings_open || self.profile_menu_open {
             return;
         }
@@ -1126,9 +1229,12 @@ impl App {
                     self.handle_ui_action(action);
                     return;
                 }
-                if self.settings_open || self.profile_menu_open {
+                if self.settings_open || self.profile_menu_open || self.palette_open {
                     self.settings_open = false;
                     self.profile_menu_open = false;
+                    self.palette_open = false;
+                    self.palette_query.clear();
+                    self.palette_selected = 0;
                     self.request_redraw();
                     return;
                 }
@@ -1219,7 +1325,7 @@ impl App {
         if !self.terminal_rect.contains(self.mouse.0, self.mouse.1) {
             return;
         }
-        if self.settings_open || self.profile_menu_open {
+        if self.settings_open || self.profile_menu_open || self.palette_open {
             return;
         }
         let lines = match delta {
@@ -1353,6 +1459,9 @@ impl App {
             active,
             settings_open: self.settings_open,
             profile_menu_open: self.profile_menu_open,
+            palette_open: self.palette_open,
+            palette_query: &self.palette_query,
+            palette_selected: self.palette_selected,
             profiles: &self.profiles,
             selected_profile: &self.selected_profile,
             font_size: self.config.font.size,

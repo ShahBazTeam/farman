@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/ShahBazTeam/farman/security/advisories/new
+    about: Please report vulnerabilities privately, not as public issues.
+  - name: Questions and ideas
+    url: https://github.com/ShahBazTeam/farman/discussions
+    about: Ask usage questions or discuss ideas with the community.

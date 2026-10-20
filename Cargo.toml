@@ -1,6 +1,6 @@
 [package]
 name = "farman"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.89"
 description = "FARMAN Terminal — a Windows terminal with first-class Persian and Arabic text support"

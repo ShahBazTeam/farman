@@ -75,6 +75,9 @@ explicit and testable.
 - **Selection:** simple drag selection and logical copy are implemented.
   Block/semantic/line selection, double-click word selection and search are not
   exposed in the UI yet.
+- **UI language:** application labels and command-palette entries are English.
+  The terminal renders Persian/Arabic correctly and the installer is
+  trilingual, but in-app UI localization is not implemented yet.
 - **Hyperlinks:** alacritty stores hyperlink metadata, but OSC 8 activation is
   not exposed as clickable links yet.
 - **Tab persistence / window layout restore:** not implemented. Tabs and

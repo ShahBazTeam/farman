@@ -27,7 +27,7 @@ main.rs
   ├─ snapshot.rs        immutable render data (logical grid coordinates)
   ├─ text.rs            shaping, bidi policy, visual cell map
   ├─ renderer.rs        wgpu quads + glyphon text, glyph atlas
-  ├─ ui.rs              custom chrome layout (quads + text blocks)
+  ├─ ui.rs              custom chrome and command palette (quads + text blocks)
   ├─ config.rs          TOML, validation, AppData paths
   ├─ profile.rs         discovered + explicit shell profiles
   ├─ input.rs           key/mouse protocol encoding, shortcut parser
@@ -119,8 +119,14 @@ goes to the run's left edge. This is a best-effort mapping; see limitations.
   1. clear + base quads (background light fields, glass terminal pane,
      header/status cards, cell backgrounds, cursor/selection)
   2. terminal glyphs (clipped to the terminal rect)
-  3. overlay quads (settings/menu/toast/banner/empty-state card)
+  3. overlay quads (settings/menu/toast/banner/empty-state card/command palette)
   4. UI glyphs
+- Modal hit regions are registered full-screen first, then the panel as
+  `Noop`, then individual controls. Reverse-order hit testing lets a palette row
+  win over the dismiss layer without duplicating state.
+- Base UI text is suppressed while Settings or the command palette is open so
+  background controls do not compete with the focused surface. Terminal glyphs
+  remain underneath the overlay scrim.
 - ANSI named/indexed/true colors are resolved from the active theme, with
   session-level color overrides honored.
 - Inverse, bold, italic, underline, strikeout and wide-cell flags are mapped
@@ -134,11 +140,12 @@ feathers the edge in physical pixels. Each quad also supports:
 - vertical top/bottom colors for subtle glass gradients;
 - a radius, used by all cards/tabs/pills and the rounded cursor;
 - a softness parameter for dropped shadows;
-- a radial-light mode for the atmospheric cyan/violet fields;
+- a radial-light mode kept for future effects but currently unused; the
+  backdrop relies on band-free vertical glass gradients to avoid 8-bit banding;
 - a frosted-grain flag, applied only to translucent glass fills.
 
-The large glass surfaces are layered: a dark gradient backdrop, radial light
-fields, a translucent terminal pane, then floating header/status cards. Modal
+The large glass surfaces are layered: a dark vertical-gradient backdrop, a
+translucent terminal pane, then floating header/status cards. Modal
 sheets receive an additional dimming layer and a near-opaque tint so terminal
 text cannot bleed through and harm readability. This is a deliberate
 "readable glass" tradeoff.

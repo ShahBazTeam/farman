@@ -9,7 +9,7 @@ All commands below were actually run in this checkout on 2026-10-19/20, Windows
 cargo test
 ```
 
-Result: **50 passed, 0 failed, 0 ignored** (the exact count is visible in the
+Result: **52 passed, 0 failed, 0 ignored** (the exact count is visible in the
 test output; the suite covers the groups below).
 
 ### Unicode, shaping and bidi
@@ -48,6 +48,8 @@ test output; the suite covers the groups below).
 - Terminal layout occupies most of the viewport; hit-test precedence.
 - Glass-card geometry uses rounded quads; overlay radii >= 15 px.
 - Theme resolution and 256-color palette.
+- Command palette multi-term filtering (case-insensitive, out-of-order terms).
+- Palette action hit regions are registered above the dismiss layer.
 
 ### Windows ConPTY integration (Windows-only)
 
@@ -87,9 +89,9 @@ These were performed against the actual GUI process:
    icon, window controls, live PowerShell prompt `PS C:\Users\Omen>` and the
    floating status card.
 2. **Glass visual pass**: verified at 150% DPI that the rounded terminal pane,
-   header/status cards, soft radial light fields, borders and frosted grain
-   render without seams or ringing; modal sheets use a stronger tint so terminal
-   text does not bleed through. Screenshots:
+   header/status cards, vertical glass gradients, borders and frosted grain
+   render without banding, seams or ringing; modal sheets use a stronger tint so
+   terminal text does not bleed through. Screenshots:
    [farman-window](images/farman-window.png), [settings](images/settings.png),
    [profile-menu](images/profile-menu.png),
    [persian-session](images/persian-session.png).
@@ -114,9 +116,14 @@ These were performed against the actual GUI process:
 10. **Window work area**: at 150% DPI the startup window is 1770x1080 physical at
     (395,144); the work area is 2560x1368, and the window is centered/clamped so
     the status bar remains above the taskbar.
-11. **Clean shutdown**: `CloseMainWindow()` exited FARMAN; its `powershell.exe`
+11. **Command palette**: `Ctrl+K` and the title-bar search field opened the
+    palette; typing filtered commands, arrows moved the selection, `Enter` ran
+    New tab/Settings/theme/bidi/shell/reload actions, and `Esc` dismissed it.
+    The scrim keeps the session readable behind the card and captures the
+    pointer. Screenshot: [command-palette.png](images/command-palette.png).
+12. **Clean shutdown**: `CloseMainWindow()` exited FARMAN; its `powershell.exe`
     child and both conhost helpers were no longer running.
-12. **Startup safety**: before switching to `-NoProfile`, a user PowerShell
+13. **Startup safety**: before switching to `-NoProfile`, a user PowerShell
     profile launched an external application (OpenCode). Built-in profiles now
     pass `-NoProfile`, and a clean launch shows only the prompt.
 
@@ -125,14 +132,16 @@ These were performed against the actual GUI process:
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1
 # then install silently into a temporary directory:
-dist\FARMAN-Terminal-0.2.0-win64-setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /NOICONS /DIR=target\installer-smoke
+dist\FARMAN-Terminal-0.3.0-win64-setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /NOICONS /LANG=farsi /DIR=target\installer-smoke-030
 ```
 
 Observed:
 
 - Inno Setup 6.7.1 compiled the installer successfully.
+- The language dialog offers English, Persian and Arabic; the Persian wizard
+  pages were checked for Vazirmatn typography and RTL layout.
 - Exit code 0; `farman.exe`, docs, licenses and `config.example.toml` were
-  installed under the requested directory.
+  installed under the requested directory with `/LANG=farsi`.
 - `HKCU\...\App Paths\farman.exe` pointed at the installed executable.
 - The per-user uninstaller appeared under Apps & features and removed the
   directory and App Paths key when run with `/VERYSILENT`.
@@ -145,17 +154,19 @@ powershell -ExecutionPolicy Bypass -File scripts\package.ps1
 powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1
 ```
 
-- `target\release\farman.exe` — 11,466,752 bytes; embedded new FARMAN emblem
-  icon and Windows version metadata (`FileVersion=0.2.0`,
-  `ProductName=FARMAN Terminal`, `CompanyName=Shahbaz Team`).
-- `dist\FARMAN-Terminal-0.2.0-win64.zip` — 5,794,924 bytes; portable release
-  package with docs, licenses (including Pinar) and the example config.
-- `dist\FARMAN-Terminal-0.2.0-win64-setup.exe` — 6,636,886 bytes; per-user
-  Inno Setup installer.
+- `target\release\farman.exe` — 11,488,256 bytes; embedded FARMAN emblem
+  icon and Windows version metadata (`FileVersion=0.3.0`,
+  `ProductVersion=0.3.0`, `ProductName=FARMAN Terminal`,
+  `CompanyName=Shahbaz Team`).
+- `dist\FARMAN-Terminal-0.3.0-win64.zip` — portable release package with
+  updated docs, screenshots, licenses (including Pinar) and the example config.
+- `dist\FARMAN-Terminal-0.3.0-win64-setup.exe` — per-user trilingual Inno Setup
+  installer.
 - SHA-256:
-  - executable `64EBD8AAD145A32E092EA2FEF4A18D5BE1B34F6662AD2D9ED93DD21740EADD82`
-  - portable ZIP `5FA24F6F1E72CC7F112512C79B1365F856A68F18C9029F4FF4642FD48E3FE020`
-  - installer `40189E735960EC6FACA4E1A23CF58D1890B74680A3965DD1C7EF5447ADF9BF19`
+  - executable `EFFB589853845E6CFF18B1C2D779C6AC82654C53C9BC31D34B3AAB4A6CF4F052`
+  - the archive checksums are written to `dist\SHA256SUMS.txt` and published
+    with the GitHub Release (embedding them in docs would change the archives
+    they describe).
 - The release executable is launched and closed successfully after packaging.
 
 ## Not tested / not claimed
