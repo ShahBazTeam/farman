@@ -145,17 +145,17 @@ powershell -ExecutionPolicy Bypass -File scripts\package.ps1
 powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1
 ```
 
-- `target\release\farman.exe` — 12,717,056 bytes; embedded icon and Windows
-  version metadata (`FileVersion=0.2.0`, `ProductName=FARMAN Terminal`,
-  `CompanyName=Shahbaz Team`).
-- `dist\FARMAN-Terminal-0.2.0-win64.zip` — 6,763,052 bytes; portable release
+- `target\release\farman.exe` — 11,466,752 bytes; embedded new FARMAN emblem
+  icon and Windows version metadata (`FileVersion=0.2.0`,
+  `ProductName=FARMAN Terminal`, `CompanyName=Shahbaz Team`).
+- `dist\FARMAN-Terminal-0.2.0-win64.zip` — 5,794,924 bytes; portable release
   package with docs, licenses (including Pinar) and the example config.
-- `dist\FARMAN-Terminal-0.2.0-win64-setup.exe` — 7,469,709 bytes; per-user
+- `dist\FARMAN-Terminal-0.2.0-win64-setup.exe` — 6,636,886 bytes; per-user
   Inno Setup installer.
 - SHA-256:
-  - executable `9F59423A55CFAFEC9DC82364B710CC30C940981BF4D712911BD7E5814296CAA8`
-  - portable ZIP `1C201547F11B20008C1C1AE3C3BC0DB1A166B3F9A3FA7000EBEAEF4A630DEECD`
-  - installer `F91D61B191FCBD3955CBCAF655D453C97A77836D547F8AEEBB686DA52D428A70`
+  - executable `64EBD8AAD145A32E092EA2FEF4A18D5BE1B34F6662AD2D9ED93DD21740EADD82`
+  - portable ZIP `5FA24F6F1E72CC7F112512C79B1365F856A68F18C9029F4FF4642FD48E3FE020`
+  - installer `40189E735960EC6FACA4E1A23CF58D1890B74680A3965DD1C7EF5447ADF9BF19`
 - The release executable is launched and closed successfully after packaging.
 
 ## Not tested / not claimed
