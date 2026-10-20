@@ -25,8 +25,10 @@ positions remain correct.
   shell without leaving the keyboard.
 - **Trilingual installer** - the Windows setup wizard is available in
   **English**, **فارسی**, and **العربية**, including RTL layout.
-- **Real shells, not a mock** - Windows PowerShell, PowerShell 7, Command
-  Prompt, WSL when installed, and custom profiles over ConPTY.
+- **Real shells, not a mock** - FARMAN is the terminal emulator; Windows
+  PowerShell, PowerShell 7, Command Prompt, WSL when installed, and custom
+  profiles run as shells behind ConPTY. Profiles are discovered locally and can
+  be replaced in `config.toml`.
 - **GPU terminal** - `winit` + `wgpu` + `glyphon` + `cosmic-text`, with ANSI/VT
   parsing from `alacritty_terminal`.
 - **Focused glass UI** - frameless custom chrome, translucent cards, soft

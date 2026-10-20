@@ -179,6 +179,7 @@ pub struct Chrome {
     pub base_quads: Vec<Quad>,
     pub overlay_quads: Vec<Quad>,
     pub text: Vec<TextBlock>,
+    pub images: Vec<Rect>,
     pub hits: Vec<HitRegion>,
     pub terminal_rect: Rect,
     pub drag_region: Rect,
@@ -300,12 +301,14 @@ pub fn build(input: ChromeInput<'_>) -> Chrome {
     let mut overlay_quads = Vec::new();
     let mut base_text = Vec::new();
     let mut text = Vec::new();
+    let mut images = Vec::new();
     let mut hits = Vec::new();
 
     paint_backdrop(&mut base_quads, width, height, theme, s);
     paint_title_bar(
         &mut base_quads,
         &mut base_text,
+        &mut images,
         &mut hits,
         &l,
         width,
@@ -335,6 +338,7 @@ pub fn build(input: ChromeInput<'_>) -> Chrome {
         paint_empty_state(
             &mut base_quads,
             &mut base_text,
+            &mut images,
             &mut hits,
             l.terminal,
             theme,
@@ -454,6 +458,7 @@ pub fn build(input: ChromeInput<'_>) -> Chrome {
         base_quads,
         overlay_quads,
         text,
+        images,
         hits,
         terminal_rect: l.terminal,
         drag_region,
@@ -505,6 +510,7 @@ fn paint_backdrop(
 fn paint_title_bar(
     quads: &mut Vec<Quad>,
     text: &mut Vec<TextBlock>,
+    images: &mut Vec<Rect>,
     hits: &mut Vec<HitRegion>,
     l: &Layout,
     width: f32,
@@ -526,8 +532,8 @@ fn paint_title_bar(
         0.0,
     ));
 
-    let mark = Rect::new(14.0 * s, 7.0 * s, 22.0 * s, 22.0 * s);
-    paint_mark(quads, text, mark, theme, s);
+    let mark = Rect::new(14.0 * s, 6.0 * s, 24.0 * s, 24.0 * s);
+    paint_mark(quads, images, mark, theme, s);
 
     text.push(
         TextBlock::new(
@@ -1128,6 +1134,7 @@ fn paint_settings_button(
 fn paint_empty_state(
     quads: &mut Vec<Quad>,
     text: &mut Vec<TextBlock>,
+    images: &mut Vec<Rect>,
     hits: &mut Vec<HitRegion>,
     terminal: Rect,
     theme: &Theme,
@@ -1137,7 +1144,7 @@ fn paint_empty_state(
     let cx = terminal.x + terminal.w * 0.5;
     let center_y = terminal.y + terminal.h * 0.43;
     let mark = Rect::new(cx - 27.0 * s, center_y - 88.0 * s, 54.0 * s, 54.0 * s);
-    paint_mark(quads, text, mark, theme, s);
+    paint_mark(quads, images, mark, theme, s);
     text.push(
         TextBlock::new(
             "FARMAN",
@@ -1195,41 +1202,13 @@ fn paint_empty_state(
 }
 
 fn paint_mark(
-    quads: &mut Vec<Quad>,
-    text: &mut Vec<TextBlock>,
+    _quads: &mut Vec<Quad>,
+    images: &mut Vec<Rect>,
     rect: Rect,
-    theme: &Theme,
-    s: f32,
+    _theme: &Theme,
+    _s: f32,
 ) {
-    let radius = rect.w * 0.28;
-    quads.push(Quad::soft(
-        Rect::new(rect.x - 4.0 * s, rect.y + 3.0 * s, rect.w + 8.0 * s, rect.h + 8.0 * s),
-        alpha(theme.accent, 0.14),
-        radius,
-        8.0 * s,
-    ));
-    quads.push(Quad::glass(
-        rect,
-        Rgba::opaque(theme.accent),
-        Rgba::opaque(theme.accent.blend(theme.accent_violet, 0.7)),
-        radius,
-    ));
-    quads.push(Quad::rounded(
-        Rect::new(rect.x + 1.0 * s, rect.y + 1.0 * s, (rect.w - 2.0 * s).max(1.0), (rect.h - 2.0 * s).max(1.0)),
-        alpha(theme.foreground, 0.12),
-        radius,
-    ));
-    text.push(
-        TextBlock::new(
-            "F",
-            Rect::new(rect.x, rect.y - 1.0 * s, rect.w, rect.h),
-            rect.h * 0.54,
-            theme.cursor_text,
-        )
-        .align(TextAlign::Center)
-        .weight(Weight::BOLD)
-        .width(rect.w),
-    );
+    images.push(rect);
 }
 
 #[allow(clippy::too_many_arguments)]

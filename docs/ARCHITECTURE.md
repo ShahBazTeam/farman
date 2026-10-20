@@ -115,12 +115,16 @@ goes to the run's left edge. This is a best-effort mapping; see limitations.
   without terminal text bleeding through.
 - Colored rectangles (cell backgrounds, selection, cursor, panel chrome,
   borders) use a small wgpu quad pipeline with an sRGB-aware color path.
+- The FARMAN emblem is an embedded PNG uploaded once to an sRGB texture and
+  drawn through a premultiplied-alpha image pipeline, so the title bar and empty
+  state use the real artwork instead of a letter badge.
 - Render order:
-  1. clear + base quads (background light fields, glass terminal pane,
+  1. clear + base quads (background gradient, glass terminal pane,
      header/status cards, cell backgrounds, cursor/selection)
-  2. terminal glyphs (clipped to the terminal rect)
-  3. overlay quads (settings/menu/toast/banner/empty-state card/command palette)
-  4. UI glyphs
+  2. embedded mark images
+  3. terminal glyphs (clipped to the terminal rect)
+  4. overlay quads (settings/menu/toast/banner/empty-state card/command palette)
+  5. UI glyphs
 - Modal hit regions are registered full-screen first, then the panel as
   `Noop`, then individual controls. Reverse-order hit testing lets a palette row
   win over the dismiss layer without duplicating state.

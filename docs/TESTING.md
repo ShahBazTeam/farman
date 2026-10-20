@@ -90,8 +90,9 @@ These were performed against the actual GUI process:
    floating status card.
 2. **Glass visual pass**: verified at 150% DPI that the rounded terminal pane,
    header/status cards, vertical glass gradients, borders and frosted grain
-   render without banding, seams or ringing; modal sheets use a stronger tint so
-   terminal text does not bleed through. Screenshots:
+   render without banding, seams or ringing; the embedded FARMAN emblem has a
+   clean transparent background in both the title bar and empty state, and modal
+   sheets use a stronger tint so terminal text does not bleed through. Screenshots:
    [farman-window](images/farman-window.png), [settings](images/settings.png),
    [profile-menu](images/profile-menu.png),
    [persian-session](images/persian-session.png).
@@ -154,8 +155,8 @@ powershell -ExecutionPolicy Bypass -File scripts\package.ps1
 powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1
 ```
 
-- `target\release\farman.exe` — 11,488,256 bytes; embedded FARMAN emblem
-  icon and Windows version metadata (`FileVersion=0.3.0`,
+- `target\release\farman.exe` — 11,593,216 bytes; embedded FARMAN emblem
+  artwork/icon and Windows version metadata (`FileVersion=0.3.0`,
   `ProductVersion=0.3.0`, `ProductName=FARMAN Terminal`,
   `CompanyName=Shahbaz Team`).
 - `dist\FARMAN-Terminal-0.3.0-win64.zip` — portable release package with
@@ -163,7 +164,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1
 - `dist\FARMAN-Terminal-0.3.0-win64-setup.exe` — per-user trilingual Inno Setup
   installer.
 - SHA-256:
-  - executable `EFFB589853845E6CFF18B1C2D779C6AC82654C53C9BC31D34B3AAB4A6CF4F052`
+  - executable `6B629DA4419482A2868369D9B3B04E6948A92FB58E916226A0ED420685FAAFFA`
   - the archive checksums are written to `dist\SHA256SUMS.txt` and published
     with the GitHub Release (embedding them in docs would change the archives
     they describe).

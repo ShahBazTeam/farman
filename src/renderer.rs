@@ -13,12 +13,15 @@ use glyphon::{
 };
 use std::mem;
 use wgpu::{
-    BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
-    BlendState, BufferBindingType, BufferDescriptor, BufferUsages, ColorTargetState, ColorWrites,
-    Device, FragmentState, LoadOp, MultisampleState, Operations, PipelineLayoutDescriptor,
-    PrimitiveState, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
-    RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource, ShaderStages,
-    StoreOp, TextureFormat, TextureView, VertexAttribute, VertexBufferLayout, VertexFormat,
+    AddressMode, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
+    BindingType, BlendState, BufferBindingType, BufferDescriptor, BufferUsages, ColorTargetState,
+    ColorWrites, Device, Extent3d, FilterMode, FragmentState, LoadOp, MultisampleState, Operations,
+    Origin3d, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
+    RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
+    SamplerBindingType, SamplerDescriptor, ShaderModuleDescriptor, ShaderSource, ShaderStages,
+    StoreOp, TexelCopyBufferLayout, TexelCopyTextureInfo, TextureAspect, TextureDescriptor,
+    TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView,
+    TextureViewDescriptor, TextureViewDimension, VertexAttribute, VertexBufferLayout, VertexFormat,
     VertexState, VertexStepMode,
 };
 
@@ -178,6 +181,7 @@ pub struct Scene {
     pub base_quads: Vec<Quad>,
     pub overlay_quads: Vec<Quad>,
     pub text: Vec<TextBlock>,
+    pub images: Vec<Rect>,
     pub terminal: Option<Snapshot>,
     pub terminal_rect: Rect,
     pub bidi_policy: BidiPolicy,
@@ -194,6 +198,7 @@ impl Default for Scene {
             base_quads: Vec::new(),
             overlay_quads: Vec::new(),
             text: Vec::new(),
+            images: Vec::new(),
             terminal: None,
             terminal_rect: Rect::default(),
             bidi_policy: BidiPolicy::Auto,
@@ -215,6 +220,7 @@ pub struct GpuRenderer {
     width: u32,
     height: u32,
     quads: QuadPipeline,
+    images: ImagePipeline,
     atlas: TextAtlas,
     viewport: Viewport,
     terminal_text: TextRenderer,
@@ -248,6 +254,7 @@ impl GpuRenderer {
         );
         let ui_text = TextRenderer::new(&mut atlas, device, MultisampleState::default(), None);
         let quads = QuadPipeline::new(device, target_format);
+        let images = ImagePipeline::new(device, queue, target_format);
         Ok(Self {
             engine,
             buffer: None,
@@ -262,6 +269,7 @@ impl GpuRenderer {
             width,
             height,
             quads,
+            images,
             atlas,
             viewport,
             terminal_text,
@@ -556,6 +564,14 @@ impl GpuRenderer {
                 queue,
                 &mut pass,
                 &base_quads,
+                self.width,
+                self.height,
+            );
+            self.images.draw(
+                device,
+                queue,
+                &mut pass,
+                &scene.images,
                 self.width,
                 self.height,
             );
@@ -1019,6 +1035,299 @@ impl QuadPipeline {
             self.vertex_capacity = (bytes.len() as u64).next_power_of_two();
             self.vertices = device.create_buffer(&BufferDescriptor {
                 label: Some("FARMAN quad vertices"),
+                size: self.vertex_capacity,
+                usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+        }
+        queue.write_buffer(&self.vertices, 0, bytes);
+        let globals = [width as f32, height as f32, 0.0, 0.0];
+        queue.write_buffer(&self.uniform, 0, bytemuck::cast_slice(&globals));
+        self.vertex_count = vertices.len() as u32;
+        pass.set_pipeline(&self.pipeline);
+        pass.set_bind_group(0, &self.bind_group, &[]);
+        pass.set_vertex_buffer(0, self.vertices.slice(..));
+        pass.draw(0..self.vertex_count, 0..1);
+    }
+}
+
+const MARK_PNG: &[u8] = include_bytes!("../assets/farman-mark.png");
+
+const IMAGE_SHADER: &str = r#"
+struct Globals {
+    viewport: vec2<f32>,
+    _pad: vec2<f32>,
+};
+@group(0) @binding(0) var<uniform> globals: Globals;
+@group(0) @binding(1) var mark: texture_2d<f32>;
+@group(0) @binding(2) var mark_sampler: sampler;
+
+struct VertexIn {
+    @location(0) pos: vec2<f32>,
+    @location(1) uv: vec2<f32>,
+};
+
+struct VertexOut {
+    @builtin(position) position: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+};
+
+@vertex
+fn vs_main(input: VertexIn) -> VertexOut {
+    var out: VertexOut;
+    let ndc = vec2<f32>(
+        input.pos.x / globals.viewport.x * 2.0 - 1.0,
+        1.0 - input.pos.y / globals.viewport.y * 2.0,
+    );
+    out.position = vec4<f32>(ndc, 0.0, 1.0);
+    out.uv = input.uv;
+    return out;
+}
+
+@fragment
+fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
+    return textureSample(mark, mark_sampler, input.uv);
+}
+"#;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Pod, Zeroable)]
+struct ImageVertex {
+    pos: [f32; 2],
+    uv: [f32; 2],
+}
+
+const IMAGE_VERTEX_ATTRIBUTES: [VertexAttribute; 2] = [
+    VertexAttribute {
+        format: VertexFormat::Float32x2,
+        offset: 0,
+        shader_location: 0,
+    },
+    VertexAttribute {
+        format: VertexFormat::Float32x2,
+        offset: 8,
+        shader_location: 1,
+    },
+];
+
+struct ImagePipeline {
+    pipeline: RenderPipeline,
+    bind_group: BindGroup,
+    _bind_group_layout: BindGroupLayout,
+    uniform: wgpu::Buffer,
+    vertices: wgpu::Buffer,
+    vertex_capacity: u64,
+    vertex_count: u32,
+}
+
+impl ImagePipeline {
+    fn new(device: &Device, queue: &Queue, format: TextureFormat) -> Self {
+        let image = image::load_from_memory(MARK_PNG)
+            .expect("embedded FARMAN mark must decode")
+            .to_rgba8();
+        let (width, height) = image.dimensions();
+        let row_bytes = width as usize * 4;
+        let padded_row_bytes = row_bytes
+            .div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize)
+            * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
+        let mut pixels = vec![0u8; padded_row_bytes * height as usize];
+        for row in 0..height as usize {
+            let source = &image.as_raw()[row * row_bytes..(row + 1) * row_bytes];
+            pixels[row * padded_row_bytes..row * padded_row_bytes + row_bytes]
+                .copy_from_slice(source);
+        }
+        let texture = device.create_texture(&TextureDescriptor {
+            label: Some("FARMAN mark texture"),
+            size: Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8UnormSrgb,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        queue.write_texture(
+            TexelCopyTextureInfo {
+                texture: &texture,
+                mip_level: 0,
+                origin: Origin3d::ZERO,
+                aspect: TextureAspect::All,
+            },
+            &pixels,
+            TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(padded_row_bytes as u32),
+                rows_per_image: Some(height),
+            },
+            Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+        let view = texture.create_view(&TextureViewDescriptor::default());
+        let sampler = device.create_sampler(&SamplerDescriptor {
+            label: Some("FARMAN mark sampler"),
+            address_mode_u: AddressMode::ClampToEdge,
+            address_mode_v: AddressMode::ClampToEdge,
+            address_mode_w: AddressMode::ClampToEdge,
+            mag_filter: FilterMode::Linear,
+            min_filter: FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+            ..Default::default()
+        });
+
+        let shader = device.create_shader_module(ShaderModuleDescriptor {
+            label: Some("FARMAN image shader"),
+            source: ShaderSource::Wgsl(IMAGE_SHADER.into()),
+        });
+        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("FARMAN image layout"),
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        sample_type: TextureSampleType::Float { filterable: true },
+                        view_dimension: TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+        let uniform = device.create_buffer(&BufferDescriptor {
+            label: Some("FARMAN image globals"),
+            size: 16,
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("FARMAN image group"),
+            layout: &bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: uniform.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
+        let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some("FARMAN image pipeline layout"),
+            bind_group_layouts: &[Some(&bind_group_layout)],
+            immediate_size: 0,
+        });
+        let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: Some("FARMAN image pipeline"),
+            layout: Some(&layout),
+            vertex: VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[Some(VertexBufferLayout {
+                    array_stride: mem::size_of::<ImageVertex>() as u64,
+                    step_mode: VertexStepMode::Vertex,
+                    attributes: &IMAGE_VERTEX_ATTRIBUTES,
+                })],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(ColorTargetState {
+                    format,
+                    blend: Some(BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+                    write_mask: ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+        let vertex_capacity = 6 * 64 * mem::size_of::<ImageVertex>() as u64;
+        let vertices = device.create_buffer(&BufferDescriptor {
+            label: Some("FARMAN image vertices"),
+            size: vertex_capacity,
+            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        Self {
+            pipeline,
+            bind_group,
+            _bind_group_layout: bind_group_layout,
+            uniform,
+            vertices,
+            vertex_capacity,
+            vertex_count: 0,
+        }
+    }
+
+    fn draw(
+        &mut self,
+        device: &Device,
+        queue: &Queue,
+        pass: &mut RenderPass<'_>,
+        images: &[Rect],
+        width: u32,
+        height: u32,
+    ) {
+        if images.is_empty() {
+            return;
+        }
+        let mut vertices = Vec::with_capacity(images.len() * 6);
+        for rect in images {
+            let x0 = rect.x;
+            let y0 = rect.y;
+            let x1 = rect.right();
+            let y1 = rect.bottom();
+            let mut push = |x: f32, y: f32, u: f32, v: f32| {
+                vertices.push(ImageVertex {
+                    pos: [x, y],
+                    uv: [u, v],
+                });
+            };
+            push(x0, y0, 0.0, 0.0);
+            push(x1, y0, 1.0, 0.0);
+            push(x1, y1, 1.0, 1.0);
+            push(x0, y0, 0.0, 0.0);
+            push(x1, y1, 1.0, 1.0);
+            push(x0, y1, 0.0, 1.0);
+        }
+        let bytes: &[u8] = bytemuck::cast_slice(&vertices);
+        if bytes.len() as u64 > self.vertex_capacity {
+            self.vertex_capacity = (bytes.len() as u64).next_power_of_two();
+            self.vertices = device.create_buffer(&BufferDescriptor {
+                label: Some("FARMAN image vertices"),
                 size: self.vertex_capacity,
                 usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
                 mapped_at_creation: false,

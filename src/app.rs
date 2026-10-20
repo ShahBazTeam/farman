@@ -1500,6 +1500,7 @@ impl App {
             base_quads: chrome.base_quads,
             overlay_quads: chrome.overlay_quads,
             text: chrome.text,
+            images: chrome.images,
             terminal: snapshot,
             terminal_rect: chrome.terminal_rect,
             bidi_policy: BidiPolicy::from_config(&self.config.bidi),

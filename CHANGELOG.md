@@ -9,6 +9,8 @@ All notable changes to FARMAN Terminal are documented here.
 - Command palette (`Ctrl+K`) with multi-term filtering, keyboard navigation,
   theme switching, bidi toggle, shell selection and config reload.
 - Title-bar command search field.
+- The FARMAN emblem artwork is now rendered in the title bar and empty state
+  instead of a letter badge.
 - Trilingual Windows installer: English, Persian and Arabic, including RTL
   wizard layout.
 - Open-source project files: contributing guide, code of conduct, security

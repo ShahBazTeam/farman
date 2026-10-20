@@ -2,6 +2,7 @@ fn main() {
     println!("cargo:rerun-if-changed=assets/farman.ico");
     println!("cargo:rerun-if-changed=assets/farman-icon.png");
     println!("cargo:rerun-if-changed=assets/farman-logo.png");
+    println!("cargo:rerun-if-changed=assets/farman-mark.png");
     println!("cargo:rerun-if-changed=build.rs");
 
     #[cfg(windows)]
